@@ -1,0 +1,21 @@
+{
+  "name": "balduinobackend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
+    "dev": "ts-node-dev --ignore-watch node_modules src/index.ts",
+    "format": "npx prettier --write ."
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "prettier": "^3.3.3",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "express": "^4.21.1"
+  }
+}
