@@ -1,6 +1,10 @@
-import { IsNotEmpty, IsString, IsEmail, IsOptional, IsBoolean, IsDate } from "class-validator";
+import { IsNotEmpty, IsString, IsEmail, IsOptional, IsBoolean, IsDate, IsUUID } from "class-validator";
 
 export default class UserDto {
+    @IsOptional()
+    @IsUUID()
+    userId!: string;
+
     @IsNotEmpty({ message: 'Username is required' })
     @IsString({ message: 'Username must be a string' })
     name!: string;

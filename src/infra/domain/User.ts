@@ -2,9 +2,10 @@ import bcrypt from 'bcrypt';
 import { v4 as uuid } from 'uuid';
 
 export interface UserProps {
+    user_id?: string;
     name: string;
     email: string;
-    password: string;
+    password?: string;
     cpf?: string;
     birthday?: Date;
     admin: boolean;
@@ -12,7 +13,7 @@ export interface UserProps {
 }
 
 export default class User {
-    private _user_id: string;
+    private _user_id?: string;
     private _name: string;
     private _email: string;
     private _password: string;
@@ -24,16 +25,16 @@ export default class User {
     private _updated_at?: Date;
 
     constructor(props: UserProps) {
-        this._user_id =  uuid();
+        this._user_id = props.user_id ?? uuid();
         this._name = props.name;
         this._email = props.email;
-        this._password = this.hashPassword(props.password);
+        this._password = props.password ? this.hashPassword(props.password) : '';
         this._cpf = props.cpf;
         this._birthday = props.birthday;
         this._admin = props.admin;
         this._active = props.active;
         this._created_at = new Date();
-        this._updated_at = new Date();
+        this._updated_at = props.user_id ? new Date() : undefined;
 
         this.validate();
     }
@@ -53,6 +54,19 @@ export default class User {
 
     public async verifyPassword(password: string): Promise<boolean> {
         return await bcrypt.compare(password, this._password);
+    }
+
+    public update(props: Partial<UserProps>) {
+        if (props.name) this._name = props.name;
+        if (props.email) this._email = props.email;
+        if (props.password) this._password = this.hashPassword(props.password);
+        if (props.cpf) this._cpf = props.cpf;
+        if (props.birthday) this._birthday = props.birthday;
+        if (props.admin !== undefined) this._admin = props.admin;
+        if (props.active !== undefined) this._active = props.active;
+        this._updated_at = new Date();
+
+        this.validate();
     }
 
     get userId() {
