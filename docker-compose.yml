@@ -1,0 +1,11 @@
+services:
+  postgres_balduino:
+    image: postgres:14.3
+    environment:
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: balduino
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./create-tables.sql:/docker-entrypoint-initdb.d/init.sql
+ 
