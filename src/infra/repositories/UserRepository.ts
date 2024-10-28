@@ -1,4 +1,5 @@
 import IUserRepository from "../../application/repositories/UserRepository";
+import LoginResponseDto from "../controllers/auth/dto/LoginResponseDto";
 import DatabaseConnection from "../database/DatabaseConnection";
 import User from "../domain/User";
 
@@ -44,6 +45,14 @@ export default class UserRepository implements IUserRepository {
         user.userId,
       ],
     );
+  }
+
+  async getByEmail(email: string): Promise<User> {
+    const result = await this.connection?.query(
+      "SELECT * FROM balduino.user WHERE email = $1",
+      [email],
+    );
+    return result.length > 0 ? result[0] : null;
   }
 
   async getById(userId: string): Promise<User> {

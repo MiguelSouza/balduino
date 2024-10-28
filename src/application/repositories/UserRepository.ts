@@ -6,4 +6,5 @@ export default interface IUserRepository {
   getById(userId: string): Promise<User>;
   getAll(): Promise<User[]>;
   delete(userId: string): void;
+  getByEmail(email: string): Promise<User>;
 }

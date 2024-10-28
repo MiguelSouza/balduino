@@ -3,7 +3,7 @@ import cors from "cors";
 
 export default interface HttpServer {
   listen(port: number): void;
-  register(method: string, url: string, callback: Function): void;
+  register(method: string, url: string, middlewares: Array<Function>, callback: Function): void;
 }
 
 export default class ExpressAdapter implements HttpServer {
@@ -15,8 +15,8 @@ export default class ExpressAdapter implements HttpServer {
     this.app.use(cors());
   }
 
-  register(method: string, url: string, callback: Function): void {
-    this.app[method](url, async function (req: Request, res: Response) {
+  register(method: string, url: string,  middlewares: Array<Function>, callback: Function): void {
+    this.app[method](url, ...middlewares, async function (req: Request, res: Response) {
       const output = await callback(req.params, req.body);
       res.json(output);
     });
