@@ -1,4 +1,9 @@
 import LoginUseCase from "./application/usecases/auth/LoginUseCase";
+import CreateCustomerUseCase from "./application/usecases/customer/CreateCustomerUseCase";
+import DeleteCustomerUseCase from "./application/usecases/customer/DeleteCustomerUseCase";
+import GetAllCustomerUseCase from "./application/usecases/customer/GetAllCustomerUseCase";
+import GetCustomerByIdUseCase from "./application/usecases/customer/GetCustomerByIdUseCase";
+import UpdateCustomerUseCase from "./application/usecases/customer/UpdateCustomerUseCase";
 import CreateTableUseCase from "./application/usecases/table/CreateTableUseCase";
 import DeleteTableUseCase from "./application/usecases/table/DeleteTableUseCase";
 import GetAllTableUseCase from "./application/usecases/table/GetAllTableUseCase";
@@ -10,10 +15,12 @@ import GetAllUseCase from "./application/usecases/users/GetAllUseCase";
 import GetUsersByIdUseCase from "./application/usecases/users/GetUsersByIdUseCase";
 import UpdateUserUseCase from "./application/usecases/users/UpdateUserUseCase";
 import AuthController from "./infra/controllers/auth/AuthController";
+import CustomerController from "./infra/controllers/customer/CustomerController";
 import TableController from "./infra/controllers/table/TableController";
 import UserController from "./infra/controllers/user/UserController";
 import DatabaseConnection from "./infra/database/DatabaseConnection";
 import HttpServer from "./infra/http/HttpServer";
+import CustomerRepository from "./infra/repositories/CustomerRepository";
 import TableRepository from "./infra/repositories/TableRepository";
 import UserRepository from "./infra/repositories/UserRepository";
 
@@ -51,6 +58,21 @@ async function main() {
     deleteTableUseCase,
     getAllTableUseCase,
     getTablesByIdUseCase
+  )
+
+  const customerRepository = new CustomerRepository(databaseConnection);
+  const createCustomerUseCase = new CreateCustomerUseCase(customerRepository);
+  const updateCustomerUseCase = new UpdateCustomerUseCase(customerRepository);
+  const deleteCustomerUseCase = new DeleteCustomerUseCase(customerRepository);
+  const getAllCustomerUseCase = new GetAllCustomerUseCase(customerRepository);
+  const getCustomerByIdUseCase = new GetCustomerByIdUseCase(customerRepository);
+  
+  new CustomerController(httpServer,
+    createCustomerUseCase,
+    updateCustomerUseCase,
+    deleteCustomerUseCase,
+    getAllCustomerUseCase,
+    getCustomerByIdUseCase
   )
   httpServer.listen(3000);
 }
