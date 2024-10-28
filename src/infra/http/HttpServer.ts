@@ -11,14 +11,14 @@ export default class ExpressAdapter implements HttpServer {
 
   constructor() {
     this.app = express();
-    this.app.use(express.json())
+    this.app.use(express.json());
     this.app.use(cors());
   }
 
   register(method: string, url: string, callback: Function): void {
     this.app[method](url, async function (req: Request, res: Response) {
-        const output = await callback(req.params, req.body);
-        res.json(output);
+      const output = await callback(req.params, req.body);
+      res.json(output);
     });
   }
 

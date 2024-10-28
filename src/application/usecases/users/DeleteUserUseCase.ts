@@ -1,13 +1,13 @@
 import UserRepository from "../../../infra/repositories/UserRepository";
 
 export default class DeleteUserUseCase {
-    userRepository?: UserRepository;
+  userRepository?: UserRepository;
 
-    constructor(userRepository: UserRepository){
-        this.userRepository = userRepository;
-    }
+  constructor(userRepository: UserRepository) {
+    this.userRepository = userRepository;
+  }
 
-    async execute(userId: string) {
-        this.userRepository?.delete(userId);
-    }
+  async execute(userId: string) {
+    this.userRepository?.delete(userId);
+  }
 }
