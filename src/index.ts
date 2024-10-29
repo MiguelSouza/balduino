@@ -4,6 +4,11 @@ import DeleteCustomerUseCase from "./application/usecases/customer/DeleteCustome
 import GetAllCustomerUseCase from "./application/usecases/customer/GetAllCustomerUseCase";
 import GetCustomerByIdUseCase from "./application/usecases/customer/GetCustomerByIdUseCase";
 import UpdateCustomerUseCase from "./application/usecases/customer/UpdateCustomerUseCase";
+import CreateProductUseCase from "./application/usecases/product/CreateProductUseCase";
+import DeleteProductUseCase from "./application/usecases/product/DeleteProductUseCase";
+import GetAllProductsUseCase from "./application/usecases/product/GetAllProductsUseCase";
+import GetProductByIdUseCase from "./application/usecases/product/GetProductByIdUseCase";
+import UpdateProductUseCase from "./application/usecases/product/UpdateProductUseCase";
 import CreateTableUseCase from "./application/usecases/table/CreateTableUseCase";
 import DeleteTableUseCase from "./application/usecases/table/DeleteTableUseCase";
 import GetAllTableUseCase from "./application/usecases/table/GetAllTableUseCase";
@@ -16,11 +21,13 @@ import GetUsersByIdUseCase from "./application/usecases/users/GetUsersByIdUseCas
 import UpdateUserUseCase from "./application/usecases/users/UpdateUserUseCase";
 import AuthController from "./infra/controllers/auth/AuthController";
 import CustomerController from "./infra/controllers/customer/CustomerController";
+import ProductController from "./infra/controllers/product/ProductController";
 import TableController from "./infra/controllers/table/TableController";
 import UserController from "./infra/controllers/user/UserController";
 import DatabaseConnection from "./infra/database/DatabaseConnection";
 import HttpServer from "./infra/http/HttpServer";
 import CustomerRepository from "./infra/repositories/CustomerRepository";
+import ProductRepository from "./infra/repositories/ProductRepository";
 import TableRepository from "./infra/repositories/TableRepository";
 import UserRepository from "./infra/repositories/UserRepository";
 
@@ -74,6 +81,22 @@ async function main() {
     getAllCustomerUseCase,
     getCustomerByIdUseCase
   )
+
+  const productRepository = new ProductRepository(databaseConnection);
+  const createProductUseCase = new CreateProductUseCase(productRepository);
+  const updateProductUseCase = new UpdateProductUseCase(productRepository);
+  const deleteProductUseCase = new DeleteProductUseCase(productRepository);
+  const getAllProductUseCase = new GetAllProductsUseCase(productRepository);
+  const getProductByIdUseCase = new GetProductByIdUseCase(productRepository);
+  
+  new ProductController(httpServer,
+    createProductUseCase,
+    updateProductUseCase,
+    deleteProductUseCase,
+    getAllProductUseCase,
+    getProductByIdUseCase
+  )
+
   httpServer.listen(3000);
 }
 
