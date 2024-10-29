@@ -16,14 +16,24 @@ export default class ProductController {
     getAllProductUseCase: GetAllProductsUseCase,
     getProductByIdUseCase: GetProductByIdUseCase,
   ) {
-    httpServer.register("post", "/product", [jwtGuard], async (params: any, body: ProductDto) => {
-      const response = await createProductUseCase.execute(body);
-      return response;
-    });
+    httpServer.register(
+      "post",
+      "/product",
+      [jwtGuard],
+      async (params: any, body: ProductDto) => {
+        const response = await createProductUseCase.execute(body);
+        return response;
+      },
+    );
 
-    httpServer.register("put", "/product", [jwtGuard], async (params: any, body: any) => {
-      await updateProductUseCase.execute(body);
-    });
+    httpServer.register(
+      "put",
+      "/product",
+      [jwtGuard],
+      async (params: any, body: any) => {
+        await updateProductUseCase.execute(body);
+      },
+    );
 
     httpServer.register(
       "delete",
@@ -34,12 +44,22 @@ export default class ProductController {
       },
     );
 
-    httpServer.register("get", "/products", [jwtGuard], async (params: any, body: any) => {
-      return await getAllProductUseCase.execute();
-    });
+    httpServer.register(
+      "get",
+      "/products",
+      [jwtGuard],
+      async (params: any, body: any) => {
+        return await getAllProductUseCase.execute();
+      },
+    );
 
-    httpServer.register("get", "/products/:productId", [jwtGuard], async (params: any, body: any) => {
-      return await getProductByIdUseCase.execute(params.productId);
-    });
+    httpServer.register(
+      "get",
+      "/products/:productId",
+      [jwtGuard],
+      async (params: any, body: any) => {
+        return await getProductByIdUseCase.execute(params.productId);
+      },
+    );
   }
 }

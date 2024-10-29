@@ -7,7 +7,6 @@ import { jwtGuard } from "../../AuthGuard/jwtGuard";
 import HttpServer from "../../http/HttpServer";
 import TableDto from "./dto/TableDto";
 
-
 export default class TableController {
   constructor(
     httpServer: HttpServer,
@@ -17,14 +16,24 @@ export default class TableController {
     getAllUseCase: GetAllUseCase,
     getTableByIdUseCase: GetTablesByIdUseCase,
   ) {
-    httpServer.register("post", "/table", [jwtGuard], async (params: any, body: TableDto) => {
-      const response = await createTableUseCase.execute(body);
-      return response;
-    });
+    httpServer.register(
+      "post",
+      "/table",
+      [jwtGuard],
+      async (params: any, body: TableDto) => {
+        const response = await createTableUseCase.execute(body);
+        return response;
+      },
+    );
 
-    httpServer.register("put", "/table", [jwtGuard], async (params: any, body: any) => {
-      await updateTableUseCase.execute(body);
-    });
+    httpServer.register(
+      "put",
+      "/table",
+      [jwtGuard],
+      async (params: any, body: any) => {
+        await updateTableUseCase.execute(body);
+      },
+    );
 
     httpServer.register(
       "delete",
@@ -35,9 +44,14 @@ export default class TableController {
       },
     );
 
-    httpServer.register("get", "/tables", [jwtGuard], async (params: any, body: any) => {
-      return await getAllUseCase.execute();
-    });
+    httpServer.register(
+      "get",
+      "/tables",
+      [jwtGuard],
+      async (params: any, body: any) => {
+        return await getAllUseCase.execute();
+      },
+    );
 
     httpServer.register(
       "get",

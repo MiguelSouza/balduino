@@ -14,7 +14,7 @@ export default class CreateTableUseCase {
     try {
       const tableEntity = new Table({
         name: user.name,
-        active: user.active
+        active: user.active,
       });
       const response = await this.tableRepository?.save(tableEntity);
       return {

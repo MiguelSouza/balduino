@@ -7,7 +7,6 @@ import { jwtGuard } from "../../AuthGuard/jwtGuard";
 import HttpServer from "../../http/HttpServer";
 import CustomerDto from "./dto/CustomerDto";
 
-
 export default class CustomerController {
   constructor(
     httpServer: HttpServer,
@@ -17,14 +16,24 @@ export default class CustomerController {
     getAllCustomerUseCase: GetAllCustomerUseCase,
     getCustomerByIdUseCase: GetCustomerByIdUseCase,
   ) {
-    httpServer.register("post", "/customer", [jwtGuard], async (params: any, body: CustomerDto) => {
-      const response = await createCustomerUseCase.execute(body);
-      return response;
-    });
+    httpServer.register(
+      "post",
+      "/customer",
+      [jwtGuard],
+      async (params: any, body: CustomerDto) => {
+        const response = await createCustomerUseCase.execute(body);
+        return response;
+      },
+    );
 
-    httpServer.register("put", "/customer", [jwtGuard], async (params: any, body: any) => {
-      await updateCustomerUseCase.execute(body);
-    });
+    httpServer.register(
+      "put",
+      "/customer",
+      [jwtGuard],
+      async (params: any, body: any) => {
+        await updateCustomerUseCase.execute(body);
+      },
+    );
 
     httpServer.register(
       "delete",
@@ -35,9 +44,14 @@ export default class CustomerController {
       },
     );
 
-    httpServer.register("get", "/customers", [jwtGuard], async (params: any, body: any) => {
-      return await getAllCustomerUseCase.execute();
-    });
+    httpServer.register(
+      "get",
+      "/customers",
+      [jwtGuard],
+      async (params: any, body: any) => {
+        return await getAllCustomerUseCase.execute();
+      },
+    );
 
     httpServer.register(
       "get",

@@ -10,7 +10,9 @@ export default class UpdateCustomerUseCase {
   }
 
   async execute(customer: CustomerDto): Promise<void> {
-    const oldCustomer = await this.customerRepository?.getCustomerById(customer.customerId);
+    const oldCustomer = await this.customerRepository?.getCustomerById(
+      customer.customerId,
+    );
     const newCustomer = new Customer(oldCustomer as Customer);
     newCustomer.update({
       name: customer.name,

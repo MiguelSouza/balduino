@@ -2,7 +2,6 @@ import ProductDto from "../../../infra/controllers/product/dto/ProductDto";
 import Product from "../../../infra/domain/Product";
 import ProductRepository from "../../../infra/repositories/ProductRepository";
 
-
 export default class UpdateProductUseCase {
   productRepository?: ProductRepository;
 

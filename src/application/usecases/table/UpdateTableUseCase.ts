@@ -14,7 +14,7 @@ export default class UpdateTableUseCase {
     const newTable = new Table(oldTable as Table);
     newTable.update({
       name: table.name,
-      active: table.active
+      active: table.active,
     });
     await this.tableRepository?.update(newTable);
   }

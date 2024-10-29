@@ -61,8 +61,9 @@ export default class ProductRepository implements IProductRepository {
   }
 
   async delete(productId: string): Promise<void> {
-    this.connection?.query("delete from balduino.product where product_id = $1", [
-      productId,
-    ]);
+    this.connection?.query(
+      "delete from balduino.product where product_id = $1",
+      [productId],
+    );
   }
 }

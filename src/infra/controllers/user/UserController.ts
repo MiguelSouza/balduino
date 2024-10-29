@@ -15,10 +15,15 @@ export default class UserController {
     getAllUseCase: GetAllUseCase,
     getUserByIdUseCase: GetUsersByIdUseCase,
   ) {
-    httpServer.register("post", "/user", [], async (params: any, body: UserDto) => {
-      const response = await createUserUseCase.execute(body);
-      return response;
-    });
+    httpServer.register(
+      "post",
+      "/user",
+      [],
+      async (params: any, body: UserDto) => {
+        const response = await createUserUseCase.execute(body);
+        return response;
+      },
+    );
 
     httpServer.register("put", "/user", [], async (params: any, body: any) => {
       await updateUserUseCase.execute(body);
