@@ -7,5 +7,4 @@ export default interface IOrderRepository {
   getAll(): Promise<Order[]>;
   delete(orderId: string): void;
   getByCustomer(customerId: string): Promise<Order>;
-  getByTable(tableId: string): Promise<Order>;
 }

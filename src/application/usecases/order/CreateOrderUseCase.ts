@@ -13,8 +13,7 @@ export default class CreateOrderUseCase {
   async execute(order: OrderDto): Promise<CreateResponseDto> {
     try {
       const orderEntity = new Order({
-        tableId: order.table_id,
-        customerId: order.customer_id,
+        customer_id: order.customer_id,
         products: order.products,
         status: OrderStatus.PENDING,
       });

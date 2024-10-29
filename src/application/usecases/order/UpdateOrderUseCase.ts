@@ -10,13 +10,10 @@ export default class UpdateOrderUseCase {
   }
 
   async execute(order: OrderDto): Promise<void> {
-    const oldOrder = await this.orderRepository?.getById(
-      order.orderId,
-    );
-    const newOrder = new Order(oldOrder as Order);
+    const oldOrder = await this.orderRepository?.getById(order.orderId);
+    const newOrder = new Order(oldOrder as any);
     newOrder.update({
-      tableId: order.table_id,
-      customerId: order.customer_id,
+      customer_id: order.customer_id,
       products: order.products,
       status: order.status,
     });

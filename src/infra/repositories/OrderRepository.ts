@@ -19,11 +19,10 @@ export default class OrderRepository implements IOrderRepository {
 
   async save(order: Order): Promise<Order> {
     const result = await this.connection?.query(
-      `INSERT INTO balduino.order (order_id, table_id, customer_id, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      `INSERT INTO balduino.order (order_id, customer_id, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [
         order.orderId,
-        order.tableId,
         order.customerId,
         order.status || null,
         order.createdAt,
@@ -41,9 +40,16 @@ export default class OrderRepository implements IOrderRepository {
   ) {
     for (const product of products) {
       await this.connection?.query(
-        `INSERT INTO balduino.order_product (order_product_id, order_id, product_id, quantity)
-         VALUES ($1, $2, $3, $4)`,
-        [uuid(), orderId, product.productId, product.quantity],
+        `INSERT INTO balduino.order_product (order_product_id, order_id, product_id, quantity, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          uuid(),
+          orderId,
+          product.productId,
+          product.quantity,
+          new Date(),
+          null,
+        ],
       );
     }
   }
@@ -51,15 +57,9 @@ export default class OrderRepository implements IOrderRepository {
   async update(order: Order): Promise<void> {
     await this.connection?.query(
       `UPDATE balduino.order 
-       SET table_id = $1, customer_id = $2, status = $3, updated_at = $4
-       WHERE order_id = $5`,
-      [
-        order.tableId,
-        order.customerId,
-        order.status || null,
-        new Date(),
-        order.orderId,
-      ],
+       SET customer_id = $1, status = $2, updated_at = $3
+       WHERE order_id = $4`,
+      [order.customerId, order.status || null, new Date(), order.orderId],
     );
 
     await this.updateOrderProducts(order.orderId, order.products);
@@ -150,13 +150,6 @@ export default class OrderRepository implements IOrderRepository {
     return this.connection?.query(
       "SELECT * FROM balduino.order WHERE customer_id = $1",
       [customerId],
-    );
-  }
-
-  async getByTableId(tableId: string): Promise<Order[]> {
-    return this.connection?.query(
-      "SELECT * FROM balduino.order WHERE table_id = $1",
-      [tableId],
     );
   }
 }

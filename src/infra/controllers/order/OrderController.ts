@@ -40,7 +40,7 @@ export default class OrderController {
       "/order/:orderId",
       [jwtGuard],
       async (params: any, body: any) => {
-        await deleteOrderUseCase.execute(body.customerId);
+        await deleteOrderUseCase.execute(body.orderId);
       },
     );
 
@@ -58,7 +58,7 @@ export default class OrderController {
       "/order/:orderId",
       [jwtGuard],
       async (params: any, body: any) => {
-        return await getOrderByIdUseCase.execute(params.customerId);
+        return await getOrderByIdUseCase.execute(params.orderId);
       },
     );
   }
