@@ -7,7 +7,7 @@ export default class GetAllTableUseCase {
     this.tableRepository = tableRepository;
   }
 
-  async execute() {
-    return await this.tableRepository?.getAll();
+  async execute(query: any) {
+    return await this.tableRepository?.getAll(query);
   }
 }

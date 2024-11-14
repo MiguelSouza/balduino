@@ -7,7 +7,7 @@ export default class GetAllUseCase {
     this.userRepository = userRepository;
   }
 
-  async execute() {
-    return await this.userRepository?.getAll();
+  async execute(query: any) {
+    return await this.userRepository?.getAll(query);
   }
 }

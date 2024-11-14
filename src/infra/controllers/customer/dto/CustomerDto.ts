@@ -21,12 +21,8 @@ export default class CustomerDto {
   name!: string;
 
   @IsOptional()
-  @IsDate({ message: "Birthday must be a valid date" })
-  birthday?: Date;
-
-  @IsOptional()
-  @IsString({ message: "Birthday must be a valid date" })
-  cpf?: string;
+  @IsString()
+  phone?: string;
 
   @IsNotEmpty({ message: "Active status is required" })
   @IsBoolean({ message: "Active must be a boolean" })

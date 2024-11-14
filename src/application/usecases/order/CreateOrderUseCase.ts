@@ -14,6 +14,8 @@ export default class CreateOrderUseCase {
     try {
       const orderEntity = new Order({
         customer_id: order.customer_id,
+        table_id: order.table_id,
+        created_by: order.created_by,
         products: order.products,
         status: OrderStatus.PENDING,
       });

@@ -15,11 +15,10 @@ export default class UpdateCustomerUseCase {
     );
     const newCustomer = new Customer(oldCustomer as Customer);
     newCustomer.update({
+      customer_id: customer.customerId,
       name: customer.name,
-      tableId: customer.table_id,
+      phone: customer.phone ?? '',
       active: customer.active,
-      birthday: customer.birthday,
-      cpf: customer.cpf,
     });
     await this.customerRepository?.update(newCustomer);
   }

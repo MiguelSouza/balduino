@@ -34,12 +34,12 @@ export default class UserController {
       "/user/:userId",
       [],
       async (params: any, body: any) => {
-        await deleteUserUseCase.execute(body.userId);
+        await deleteUserUseCase.execute(params.userId);
       },
     );
 
-    httpServer.register("get", "/users", [], async (params: any, body: any) => {
-      return await getAllUseCase.execute();
+    httpServer.register("get", "/users", [], async (params: any, body: any, query: any) => {
+      return await getAllUseCase.execute(query);
     });
 
     httpServer.register(

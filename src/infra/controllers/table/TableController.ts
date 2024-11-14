@@ -48,8 +48,8 @@ export default class TableController {
       "get",
       "/tables",
       [jwtGuard],
-      async (params: any, body: any) => {
-        return await getAllUseCase.execute();
+      async (params: any, body: any, query: any) => {
+        return await getAllUseCase.execute(query);
       },
     );
 

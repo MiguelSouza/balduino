@@ -17,6 +17,7 @@ export default class UpdateProductUseCase {
       value: product.value,
       active: product.active,
       image: product.image,
+      editable: product.editable
     });
     await this.productRepository?.update(newProduct);
   }

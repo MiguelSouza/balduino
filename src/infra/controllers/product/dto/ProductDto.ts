@@ -24,7 +24,11 @@ export default class ProductDto {
   @IsNumber({}, { message: "Value must be a valid number" })
   value!: number;
 
-  @IsNotEmpty({ message: "Active status is required" })
-  @IsBoolean({ message: "Active must be a boolean" })
+  @IsOptional()
+  @IsBoolean()
   active!: boolean;
+
+  @IsNotEmpty({ message: "Editable is required" })
+  @IsBoolean()
+  editable!: boolean;
 }

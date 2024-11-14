@@ -39,8 +39,16 @@ export default class TableRepository implements ITableRepository {
     return result.length > 0 ? result[0] : null;
   }
 
-  async getAll(): Promise<Table[]> {
-    return this.connection?.query("SELECT * FROM balduino.table", null);
+  async getAll(query: any): Promise<Table[]> {
+    let sql = "SELECT * FROM balduino.table";
+    const params: string[] = [];
+  
+    if (query.name) {
+      sql += " WHERE LOWER(name) LIKE LOWER($1)";
+      params.push(`%${query.name}%`);
+    }
+    
+    return this.connection?.query(sql, params);
   }
 
   async delete(tableId: string): Promise<void> {

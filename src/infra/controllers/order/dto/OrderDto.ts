@@ -7,6 +7,7 @@ import {
   IsUUID,
   IsArray,
   ValidateNested,
+  IsNumber,
 } from "class-validator";
 import { OrderStatus } from "../../../domain/Order";
 
@@ -16,8 +17,12 @@ class ProductDto {
   productId!: string;
 
   @IsNotEmpty({ message: "Quantity is required" })
-  @IsBoolean()
+  @IsNumber()
   quantity!: number;
+
+  @IsNotEmpty({ message: "Price is required" })
+  @IsNumber()
+  price!: number;
 }
 
 export default class OrderDto {
@@ -25,9 +30,17 @@ export default class OrderDto {
   @IsUUID()
   orderId!: string;
 
-  @IsNotEmpty({ message: "Table is required" })
+  @IsNotEmpty({ message: "Customer is required" })
   @IsUUID()
   customer_id!: string;
+
+  @IsNotEmpty({ message: "Table is required" })
+  @IsUUID()
+  table_id!: string;
+
+  @IsOptional()
+  @IsUUID()
+  created_by?: string;
 
   @IsArray({ message: "Products must be an array" })
   @ValidateNested({ each: true })

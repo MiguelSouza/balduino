@@ -11,13 +11,14 @@ export default class ProductRepository implements IProductRepository {
 
   async save(product: Product): Promise<Product> {
     return this.connection?.query(
-      "insert into balduino.product (product_id, name, value, image, active, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+      "insert into balduino.product (product_id, name, value, image, active, editable, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
       [
         product.productId,
         product.name,
         product.value,
         product.image,
-        product.active,
+        true,
+        product.editable,
         product.createdAt,
         product.updatedAt,
       ],
@@ -27,13 +28,14 @@ export default class ProductRepository implements IProductRepository {
   async update(product: Product): Promise<void> {
     await this.connection?.query(
       `UPDATE balduino.product
-            SET name = $1, value = $2, image = $3, active = $4, updated_at = $5 
-            WHERE product_id = $6`,
+            SET name = $1, value = $2, image = $3, active = $4, editable = $5, updated_at = $6 
+            WHERE product_id = $7`,
       [
         product.name,
         product.value,
         product.image,
         product.active,
+        product.editable,
         new Date(),
         product.productId,
       ],
@@ -56,7 +58,7 @@ export default class ProductRepository implements IProductRepository {
     return result.length > 0 ? result[0] : null;
   }
 
-  async getAll(): Promise<Product[]> {
+  async getAll(query: any): Promise<Product[]> {
     return this.connection?.query("SELECT * FROM balduino.product", null);
   }
 

@@ -4,8 +4,10 @@ import DeleteCustomerUseCase from "./application/usecases/customer/DeleteCustome
 import GetAllCustomerUseCase from "./application/usecases/customer/GetAllCustomerUseCase";
 import GetCustomerByIdUseCase from "./application/usecases/customer/GetCustomerByIdUseCase";
 import UpdateCustomerUseCase from "./application/usecases/customer/UpdateCustomerUseCase";
+import CloseAccountUseCase from "./application/usecases/order/CloseAccountUseCase";
 import CreateOrderUseCase from "./application/usecases/order/CreateOrderUseCase";
 import DeleteOrderUseCase from "./application/usecases/order/DeleteOrderUseCase";
+import GetAllOrdersByCustomerUseCase from "./application/usecases/order/GetAllOrdersByCustomerUseCase copy";
 import GetAllOrdersUseCase from "./application/usecases/order/GetAllOrdersUseCase";
 import GetOrderByIdUseCase from "./application/usecases/order/GetOrderById";
 import UpdateOrderUseCase from "./application/usecases/order/UpdateOrderUseCase";
@@ -14,6 +16,7 @@ import DeleteProductUseCase from "./application/usecases/product/DeleteProductUs
 import GetAllProductsUseCase from "./application/usecases/product/GetAllProductsUseCase";
 import GetProductByIdUseCase from "./application/usecases/product/GetProductByIdUseCase";
 import UpdateProductUseCase from "./application/usecases/product/UpdateProductUseCase";
+import UploadImageUseCase from "./application/usecases/product/UploadImageUseCase";
 import CreateTableUseCase from "./application/usecases/table/CreateTableUseCase";
 import DeleteTableUseCase from "./application/usecases/table/DeleteTableUseCase";
 import GetAllTableUseCase from "./application/usecases/table/GetAllTableUseCase";
@@ -97,6 +100,7 @@ async function main() {
   const deleteProductUseCase = new DeleteProductUseCase(productRepository);
   const getAllProductUseCase = new GetAllProductsUseCase(productRepository);
   const getProductByIdUseCase = new GetProductByIdUseCase(productRepository);
+  const uploadImageUseCase = new UploadImageUseCase();
 
   new ProductController(
     httpServer,
@@ -105,6 +109,7 @@ async function main() {
     deleteProductUseCase,
     getAllProductUseCase,
     getProductByIdUseCase,
+    uploadImageUseCase,
   );
 
   const orderRepository = new OrderRepository(databaseConnection);
@@ -112,7 +117,9 @@ async function main() {
   const updateOrderUseCase = new UpdateOrderUseCase(orderRepository);
   const deleteOrderUseCase = new DeleteOrderUseCase(orderRepository);
   const getAllOrderUseCase = new GetAllOrdersUseCase(orderRepository);
+  const getAllOrdersByCustomerUseCase = new GetAllOrdersByCustomerUseCase(orderRepository);
   const getOrderByIdUseCase = new GetOrderByIdUseCase(orderRepository);
+  const closeAccountUseCase = new CloseAccountUseCase(orderRepository);
 
   new OrderController(
     httpServer,
@@ -120,7 +127,9 @@ async function main() {
     updateOrderUseCase,
     deleteOrderUseCase,
     getAllOrderUseCase,
+    getAllOrdersByCustomerUseCase,
     getOrderByIdUseCase,
+    closeAccountUseCase
   );
 
   httpServer.listen(3000);

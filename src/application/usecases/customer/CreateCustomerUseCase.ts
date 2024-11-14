@@ -13,12 +13,11 @@ export default class CreateCustomerUseCase {
   async execute(customer: CustomerDto): Promise<CreateResponseDto> {
     try {
       const customerEntity = new Customer({
-        tableId: customer.table_id,
         name: customer.name,
+        phone: customer.phone,
         active: customer.active,
-        birthday: customer.birthday,
-        cpf: customer.cpf,
       });
+
       const response = await this.customerRepository?.save(customerEntity);
       return {
         customer: response,

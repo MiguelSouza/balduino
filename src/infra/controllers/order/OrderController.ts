@@ -1,5 +1,7 @@
+import CloseAccountUseCase from "../../../application/usecases/order/CloseAccountUseCase";
 import CreateOrderUseCase from "../../../application/usecases/order/CreateOrderUseCase";
 import DeleteOrderUseCase from "../../../application/usecases/order/DeleteOrderUseCase";
+import GetAllOrdersByCustomerUseCase from "../../../application/usecases/order/GetAllOrdersByCustomerUseCase copy";
 import GetAllOrdersUseCase from "../../../application/usecases/order/GetAllOrdersUseCase";
 import GetOrderByIdUseCase from "../../../application/usecases/order/GetOrderById";
 import UpdateOrderUseCase from "../../../application/usecases/order/UpdateOrderUseCase";
@@ -14,7 +16,9 @@ export default class OrderController {
     updateOrderUseCase: UpdateOrderUseCase,
     deleteOrderUseCase: DeleteOrderUseCase,
     getAllOrdersUseCase: GetAllOrdersUseCase,
+    getAllOrdersByCustomerUseCase: GetAllOrdersByCustomerUseCase,
     getOrderByIdUseCase: GetOrderByIdUseCase,
+    closeAccountUseCase: CloseAccountUseCase
   ) {
     httpServer.register(
       "post",
@@ -48,8 +52,17 @@ export default class OrderController {
       "get",
       "/orders",
       [jwtGuard],
+      async (params: any, body: any, query: any) => {
+        return await getAllOrdersUseCase.execute(query);
+      },
+    );
+
+    httpServer.register(
+      "get",
+      "/orders/:customer_id/bill",
+      [jwtGuard],
       async (params: any, body: any) => {
-        return await getAllOrdersUseCase.execute();
+        return await getAllOrdersByCustomerUseCase.execute(params.customer_id);
       },
     );
 
@@ -59,6 +72,15 @@ export default class OrderController {
       [jwtGuard],
       async (params: any, body: any) => {
         return await getOrderByIdUseCase.execute(params.orderId);
+      },
+    );
+
+    httpServer.register(
+      "post",
+      "/order/:customerId/close",
+      [jwtGuard],
+      async (params: any, body: any) => {
+        return await closeAccountUseCase.execute(params.customerId, body.paymentMethod);
       },
     );
   }

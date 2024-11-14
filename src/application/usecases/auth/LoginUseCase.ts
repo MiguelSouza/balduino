@@ -14,10 +14,16 @@ export default class LoginUseCase {
 
   async execute(loginParam: LoginDto) {
     const user = await this.userRepository?.getByEmail(loginParam.email);
-    if (!user) {
-      return;
-    }
 
+    if (!user) {
+      return {
+        user: null,
+        accessToken: null,
+        errorMessage: "Email ou senha inválidos!",
+        stateCode: 401,
+      };
+    }
+    
     const isPasswordValid = await bcrypt.compare(
       loginParam.password,
       user.password,

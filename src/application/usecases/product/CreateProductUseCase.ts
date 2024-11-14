@@ -17,6 +17,7 @@ export default class CreateProductUseCase {
         active: product.active,
         value: product.value,
         image: product.image,
+        editable: product.editable,
       });
       const response = await this.productRepository?.save(productEntity);
       return {

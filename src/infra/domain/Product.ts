@@ -5,6 +5,7 @@ export interface ProductProps {
   name: string;
   value: number;
   image?: string;
+  editable: boolean;
   active: boolean;
 }
 
@@ -14,6 +15,7 @@ export default class Product {
   private _value: number;
   private _image?: string;
   private _active: boolean;
+  private _editable: boolean;
   private _created_at: Date;
   private _updated_at?: Date;
 
@@ -23,6 +25,7 @@ export default class Product {
     this._value = props.value;
     this._image = props.image;
     this._active = props.active;
+    this._editable = props.editable;
     this._created_at = new Date();
     this._updated_at = props.product_id ? new Date() : undefined;
 
@@ -32,14 +35,13 @@ export default class Product {
   private validate() {
     if (!this._name) throw new Error("Name is required.");
     if (!this._value) throw new Error("Value is required.");
-    if (typeof this._active !== "boolean")
-      throw new Error("Active must be a boolean.");
   }
 
   public update(props: Partial<ProductProps>) {
     if (props.name) this._name = props.name;
     if (props.value) this._value = props.value;
     if (props.image) this._image = props.image;
+    if (props.editable) this._editable = props.editable;
     if (props.active !== undefined) this._active = props.active;
     this._updated_at = new Date();
 
@@ -66,6 +68,10 @@ export default class Product {
     return this._active;
   }
 
+  get editable() {
+    return this._editable;
+  }
+  
   get createdAt() {
     return this._created_at;
   }

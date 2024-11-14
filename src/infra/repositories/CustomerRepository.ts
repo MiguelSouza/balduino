@@ -11,13 +11,11 @@ export default class CustomerRepository implements ICustomerRepository {
 
   async save(customer: Customer): Promise<Customer> {
     return this.connection?.query(
-      "insert into balduino.customer (customer_id, table_id, name, cpf, birthday, active, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
+      "insert into balduino.customer (customer_id, name, phone, active, created_at, updated_at) values ($1, $2, $3, $4, $5, $6) RETURNING *",
       [
         customer.customerId,
-        customer.tableId,
         customer.name,
-        customer.cpf,
-        customer.birthday,
+        customer.phone,
         customer.active,
         customer.createdAt,
         customer.updatedAt,
@@ -28,12 +26,11 @@ export default class CustomerRepository implements ICustomerRepository {
   async update(customer: Customer): Promise<void> {
     await this.connection?.query(
       `UPDATE balduino.customer 
-            SET name = $1, table_id = $2, birthday = $3, active = $4, updated_at = $5 
-            WHERE customer_id = $6`,
+            SET name = $1, phone = $2, active = $3, updated_at = $4
+            WHERE customer_id = $5`,
       [
         customer.name,
-        customer.tableId,
-        customer.birthday,
+        customer.phone,
         customer.active,
         new Date(),
         customer.customerId,
@@ -57,9 +54,20 @@ export default class CustomerRepository implements ICustomerRepository {
     return result.length > 0 ? result[0] : null;
   }
 
-  async getAll(): Promise<Customer[]> {
-    return this.connection?.query("SELECT * FROM balduino.customer", null);
+  async getAll(query: any): Promise<Customer[]> {
+    let sql = "SELECT * FROM balduino.customer";
+    const params: string[] = [];
+    let whereAdded = false;
+
+    if (query.name) {
+        sql += " WHERE LOWER(name) LIKE LOWER($1)";
+        params.push(`%${query.name}%`);
+        whereAdded = true;
+    }
+
+    return this.connection?.query(sql, params);
   }
+
 
   async delete(customerId: string): Promise<void> {
     this.connection?.query(

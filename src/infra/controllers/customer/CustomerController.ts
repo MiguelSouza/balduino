@@ -40,7 +40,7 @@ export default class CustomerController {
       "/customer/:customerId",
       [jwtGuard],
       async (params: any, body: any) => {
-        await deleteCustomerUseCase.execute(body.customerId);
+        await deleteCustomerUseCase.execute(params.customerId);
       },
     );
 
@@ -48,8 +48,8 @@ export default class CustomerController {
       "get",
       "/customers",
       [jwtGuard],
-      async (params: any, body: any) => {
-        return await getAllCustomerUseCase.execute();
+      async (params: any, body: any, query: any) => {
+        return await getAllCustomerUseCase.execute(query);
       },
     );
 

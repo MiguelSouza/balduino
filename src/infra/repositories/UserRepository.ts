@@ -63,8 +63,17 @@ export default class UserRepository implements IUserRepository {
     return result.length > 0 ? result[0] : null;
   }
 
-  async getAll(): Promise<User[]> {
-    return this.connection?.query("SELECT * FROM balduino.user", null);
+  
+  async getAll(query: any): Promise<User[]> {
+    let sql = "SELECT * FROM balduino.user";
+    const params: string[] = [];
+  
+    if (query.name) {
+      sql += " WHERE LOWER(name) LIKE LOWER($1)";
+      params.push(`%${query.name}%`);
+    }
+    
+    return this.connection?.query(sql, params);
   }
 
   async delete(userId: string): Promise<void> {
