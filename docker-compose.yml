@@ -8,5 +8,3 @@ services:
       - "5433:5432"
     volumes:
       - ./create-tables.sql:/docker-entrypoint-initdb.d/init.sql
-    # Instalar libcrypt dentro do contêiner PostgreSQL
-    command: bash -c "apt-get update && apt-get install -y libxcrypt1 && docker-entrypoint.sh postgres"
