@@ -111,11 +111,11 @@ export default class CustomerRepository implements ICustomerRepository {
 
 
   async delete(customerId: string): Promise<void> {
-    this.connection?.query(
+    await this.connection?.query(
       "delete from balduino.customer_table where customer_id = $1",
       [customerId],
     );
-    this.connection?.query(
+    await this.connection?.query(
       "delete from balduino.customer where customer_id = $1",
       [customerId],
     );
