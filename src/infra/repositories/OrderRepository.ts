@@ -146,12 +146,14 @@ export default class OrderRepository implements IOrderRepository {
         p.product_id, 
         p.name AS product_name, 
         op.quantity,
-        t.name as table_name
+        t.name as table_name,
+        u.name as delivered_by
       FROM balduino.order o 
       JOIN balduino.order_product op ON o.order_id = op.order_id
       JOIN balduino.customer c ON c.customer_id = o.customer_id
       JOIN balduino.table t ON t.table_id = o.table_id
       JOIN balduino.product p ON p.product_id = op.product_id
+      JOIN balduino.user u ON u.user_id = o.created_by
       WHERE c.active = true
     `;
 
@@ -203,6 +205,7 @@ export default class OrderRepository implements IOrderRepository {
       } else {
         ordersMap.set(row.order_id, {
           order_id: row.order_id,
+          delivered_by: row.delivered_by,
           orderNumber: row.order_number,
           customerName: row.customer_name,
           status: row.status,
