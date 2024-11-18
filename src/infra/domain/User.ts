@@ -28,10 +28,10 @@ export default class User {
     this._user_id = props.user_id ?? uuid();
     this._name = props.name;
     this._email = props.email;
-    if (!this._user_id && props.password) {
-      this._password = this.hashPassword(props.password);
-    } else if (props.password) {
+    if (props.user_id && props.password) {
       this._password = props.password;
+    } else if (props.password) {
+      this._password = this.hashPassword(props.password);
     } else {
       this._password = '';
     }
