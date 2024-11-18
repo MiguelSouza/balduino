@@ -21,5 +21,15 @@ export default class UpdateCustomerUseCase {
       active: customer.active,
     });
     await this.customerRepository?.update(newCustomer);
+
+    
+    const updatedCustomerTables = customer.customerTables.map((table: any) => ({
+      customer_id: customer.customerId,
+      day: table.day,
+      table: table.table
+    }));
+    await this.customerRepository?.removeCustomerTables(customer.customerId);
+    
+    await this.customerRepository?.saveCustomerTable(updatedCustomerTables);
   }
 }

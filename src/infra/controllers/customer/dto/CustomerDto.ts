@@ -3,18 +3,43 @@ import {
   IsString,
   IsOptional,
   IsBoolean,
-  IsDate,
+  IsEnum,
   IsUUID,
+  IsArray,
+  ValidateNested,
 } from "class-validator";
+import { Type } from "class-transformer"; // Para garantir que a validação de arrays e objetos funcione corretamente
+
+// Enum para representar os dias da semana
+export enum DayOfWeek {
+  Monday = 'monday',
+  Tuesday = 'tuesday',
+  Wednesday = 'wednesday',
+  Thursday = 'thursday',
+  Friday = 'friday',
+  Saturday = 'saturday',
+  Sunday = 'sunday',
+}
+
+// DTO para representar cada associação entre cliente e mesa
+class CustomerTableDto {
+  @IsNotEmpty({ message: "Customer ID is required" })
+  @IsUUID()
+  customer_id!: string;
+
+  @IsNotEmpty({ message: "Table ID is required" })
+  @IsUUID()
+  table_id!: string;
+
+  @IsNotEmpty({ message: "Day of week is required" })
+  @IsEnum(DayOfWeek, { message: "Day of week must be a valid day" })
+  day_of_week!: DayOfWeek;
+}
 
 export default class CustomerDto {
   @IsOptional()
   @IsUUID()
   customerId!: string;
-
-  @IsNotEmpty({ message: "Table is required" })
-  @IsUUID()
-  table_id!: string;
 
   @IsNotEmpty({ message: "Username is required" })
   @IsString({ message: "Username must be a string" })
@@ -27,4 +52,9 @@ export default class CustomerDto {
   @IsNotEmpty({ message: "Active status is required" })
   @IsBoolean({ message: "Active must be a boolean" })
   active!: boolean;
+
+  @IsArray({ message: "Customer table must be an array" })
+  @ValidateNested({ each: true })
+  @Type(() => CustomerTableDto)
+  customerTables!: CustomerTableDto[];
 }

@@ -18,7 +18,16 @@ export default class CreateCustomerUseCase {
         active: customer.active,
       });
 
-      const response = await this.customerRepository?.save(customerEntity);
+      const response: any = await this.customerRepository?.save(customerEntity);
+      
+      const updatedCustomerTables = customer.customerTables.map((table: any) => ({
+        customer_id: response[0].customer_id,
+        day: table.day,
+        table: table.table
+      }));
+
+      await this.customerRepository?.saveCustomerTable(updatedCustomerTables);
+      
       return {
         customer: response,
       };
