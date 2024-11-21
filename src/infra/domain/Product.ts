@@ -34,7 +34,6 @@ export default class Product {
 
   private validate() {
     if (!this._name) throw new Error("Name is required.");
-    if (!this._value) throw new Error("Value is required.");
   }
 
   public update(props: Partial<ProductProps>) {
