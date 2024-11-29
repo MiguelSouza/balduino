@@ -4,12 +4,27 @@ import DeleteCustomerUseCase from "./application/usecases/customer/DeleteCustome
 import GetAllCustomerUseCase from "./application/usecases/customer/GetAllCustomerUseCase";
 import GetCustomerByIdUseCase from "./application/usecases/customer/GetCustomerByIdUseCase";
 import UpdateCustomerUseCase from "./application/usecases/customer/UpdateCustomerUseCase";
+import CreateExpenseUseCase from "./application/usecases/expense/CreateExpenseUseCase";
+import DeleteExpenseUseCase from "./application/usecases/expense/DeleteExpenseUseCase";
+import GetAllExpensesUseCase from "./application/usecases/expense/GetAllExpensesUseCase";
+import GetExpenseByIdUseCase from "./application/usecases/expense/GetExpenseByIdUseCase";
+import UpdateExpenseUseCase from "./application/usecases/expense/UpdateExpenseUseCase";
+import CreateMonthlyPayerUseCase from "./application/usecases/monthlyPayer/CreateMonthlyPayerUseCase";
+import DeleteMonthlyPayerUseCase from "./application/usecases/monthlyPayer/DeleteMonthlyPayerUseCase";
+import GetAllMonthlyPayerUseCase from "./application/usecases/monthlyPayer/GetAllMonthlyPayerUseCase";
+import GetMonthlyPayerByIdUseCase from "./application/usecases/monthlyPayer/GetMonthlyPayerByIdUseCase";
+import GetPaymentsByMonthlyPayerUseCase from "./application/usecases/monthlyPayer/GetPaymentsByMonthlyPayerUseCase";
+import PaymentMonthlyUseCase from "./application/usecases/monthlyPayer/PaymentMonthlyUseCase";
+import UpdateMonthlyPayerUseCase from "./application/usecases/monthlyPayer/UpdateMonthlyPayerUseCase";
 import CloseAccountUseCase from "./application/usecases/order/CloseAccountUseCase";
+import CloseAccountWithoutCustomerUseCase from "./application/usecases/order/CloseAccountWithoutCustomerUseCase";
 import CreateOrderUseCase from "./application/usecases/order/CreateOrderUseCase";
 import DeleteOrderUseCase from "./application/usecases/order/DeleteOrderUseCase";
 import GetAllOrdersByCustomerUseCase from "./application/usecases/order/GetAllOrdersByCustomerUseCase copy";
 import GetAllOrdersUseCase from "./application/usecases/order/GetAllOrdersUseCase";
 import GetOrderByIdUseCase from "./application/usecases/order/GetOrderById";
+import GetOrdersToCloseOfTheDayUseCase from "./application/usecases/order/GetOrdersToCloseOfTheDayUseCase";
+import PartialPaymentUseCase from "./application/usecases/order/PartialPaymentUseCase";
 import UpdateOrderUseCase from "./application/usecases/order/UpdateOrderUseCase";
 import CreateProductUseCase from "./application/usecases/product/CreateProductUseCase";
 import DeleteProductUseCase from "./application/usecases/product/DeleteProductUseCase";
@@ -29,6 +44,8 @@ import GetUsersByIdUseCase from "./application/usecases/users/GetUsersByIdUseCas
 import UpdateUserUseCase from "./application/usecases/users/UpdateUserUseCase";
 import AuthController from "./infra/controllers/auth/AuthController";
 import CustomerController from "./infra/controllers/customer/CustomerController";
+import ExpenseController from "./infra/controllers/expense/ExpenseController";
+import MonthlyPayerController from "./infra/controllers/monthlyPayer/MonthlyPayerController";
 import OrderController from "./infra/controllers/order/OrderController";
 import ProductController from "./infra/controllers/product/ProductController";
 import TableController from "./infra/controllers/table/TableController";
@@ -36,6 +53,8 @@ import UserController from "./infra/controllers/user/UserController";
 import DatabaseConnection from "./infra/database/DatabaseConnection";
 import HttpServer from "./infra/http/HttpServer";
 import CustomerRepository from "./infra/repositories/CustomerRepository";
+import ExpenseRepository from "./infra/repositories/ExpenseRepository";
+import MonthlyPayerRepository from "./infra/repositories/MonthlyPayerRepository";
 import OrderRepository from "./infra/repositories/OrderRepository";
 import ProductRepository from "./infra/repositories/ProductRepository";
 import TableRepository from "./infra/repositories/TableRepository";
@@ -120,6 +139,9 @@ async function main() {
   const getAllOrdersByCustomerUseCase = new GetAllOrdersByCustomerUseCase(orderRepository);
   const getOrderByIdUseCase = new GetOrderByIdUseCase(orderRepository);
   const closeAccountUseCase = new CloseAccountUseCase(orderRepository);
+  const closeAccountWithoutCustomerUseCase = new CloseAccountWithoutCustomerUseCase(orderRepository);
+  const getOrdersToCloseOfTheDayUseCase = new GetOrdersToCloseOfTheDayUseCase(orderRepository);
+  const partialPaymentUseCase = new PartialPaymentUseCase(orderRepository);
 
   new OrderController(
     httpServer,
@@ -129,7 +151,46 @@ async function main() {
     getAllOrderUseCase,
     getAllOrdersByCustomerUseCase,
     getOrderByIdUseCase,
-    closeAccountUseCase
+    closeAccountUseCase,
+    closeAccountWithoutCustomerUseCase,
+    getOrdersToCloseOfTheDayUseCase,
+    partialPaymentUseCase
+  );
+
+  const expenseRepository = new ExpenseRepository(databaseConnection);
+  const createExpenseUseCase = new CreateExpenseUseCase(expenseRepository);
+  const updateExpenseUseCase = new UpdateExpenseUseCase(expenseRepository);
+  const deleteExpenseUseCase = new DeleteExpenseUseCase(expenseRepository);
+  const getAllExpenseUseCase = new GetAllExpensesUseCase(expenseRepository);
+  const getExpenseByIdUseCase = new GetExpenseByIdUseCase(expenseRepository);
+
+  new ExpenseController(
+    httpServer,
+    createExpenseUseCase,
+    updateExpenseUseCase,
+    deleteExpenseUseCase,
+    getAllExpenseUseCase,
+    getExpenseByIdUseCase,
+  );
+
+  const monthlyPayerRepository = new MonthlyPayerRepository(databaseConnection);
+  const createMonthlyPayerUseCase = new CreateMonthlyPayerUseCase(monthlyPayerRepository);
+  const updateMonthlyPayerUseCase = new UpdateMonthlyPayerUseCase(monthlyPayerRepository);
+  const deleteMonthlyPayerUseCase = new DeleteMonthlyPayerUseCase(monthlyPayerRepository);
+  const getAllMonthlyPayerUseCase = new GetAllMonthlyPayerUseCase(monthlyPayerRepository);
+  const getMonthlyPayerByIdUseCase = new GetMonthlyPayerByIdUseCase(monthlyPayerRepository);
+  const getPaymentsByMonthlyPayerUseCase = new GetPaymentsByMonthlyPayerUseCase(monthlyPayerRepository);
+  const paymentMonthlyUseCase = new PaymentMonthlyUseCase(monthlyPayerRepository);
+
+  new MonthlyPayerController(
+    httpServer,
+    createMonthlyPayerUseCase,
+    updateMonthlyPayerUseCase,
+    deleteMonthlyPayerUseCase,
+    getAllMonthlyPayerUseCase,
+    getMonthlyPayerByIdUseCase,
+    getPaymentsByMonthlyPayerUseCase,
+    paymentMonthlyUseCase
   );
 
   httpServer.listen(3000);

@@ -17,7 +17,7 @@ export default class CreateOrderUseCase {
         table_id: order.table_id,
         created_by: order.created_by,
         products: order.products,
-        status: OrderStatus.PENDING,
+        status: order.status ?? OrderStatus.PENDING,
       });
       const response = await this.orderRepository?.save(orderEntity);
       return {

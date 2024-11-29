@@ -8,8 +8,8 @@ export enum OrderStatus {
 
 export interface OrderProps {
   order_id?: string;
-  table_id: string;
-  customer_id: string;
+  table_id?: string;
+  customer_id?: string;
   created_by?: string;
   payment_method?: string;
   products: Array<{ productId: string; quantity: number, price: number }>;
@@ -18,8 +18,9 @@ export interface OrderProps {
 
 export default class Order {
   private _orderId: string;
-  private _customerId: string;
-  private _tableId: string;
+  private _customerId?: string;
+  private _tableId?: string;
+  private _payment_method?: string;
   private _createdBy?: string;
   private _products: Array<{ productId: string; quantity: number, price: number }>;
   private _status?: OrderStatus;
@@ -32,15 +33,15 @@ export default class Order {
     this._customerId = props.customer_id;
     this._tableId = props.table_id;
     this._products = props.products;
+    this._payment_method = props.payment_method;
     this._status = props.status;
     this._createdAt = new Date();
-    this._updatedAt = props.order_id ? new Date() : undefined;
+    this._updatedAt = new Date();
 
     this.validate();
   }
 
   private validate() {
-    if (!this._customerId) throw new Error("Customer ID is required.");
     if (!this._products || this._products.length === 0)
       throw new Error("At least one product is required.");
   }
@@ -56,6 +57,10 @@ export default class Order {
 
   get orderId() {
     return this._orderId;
+  }
+
+  get paymentMethod() {
+    return this._payment_method;
   }
 
   get customerId() {

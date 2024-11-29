@@ -8,9 +8,8 @@ import {
   IsArray,
   ValidateNested,
 } from "class-validator";
-import { Type } from "class-transformer"; // Para garantir que a validação de arrays e objetos funcione corretamente
+import { Type } from "class-transformer";
 
-// Enum para representar os dias da semana
 export enum DayOfWeek {
   Monday = 'monday',
   Tuesday = 'tuesday',
@@ -21,7 +20,6 @@ export enum DayOfWeek {
   Sunday = 'sunday',
 }
 
-// DTO para representar cada associação entre cliente e mesa
 class CustomerTableDto {
   @IsNotEmpty({ message: "Customer ID is required" })
   @IsUUID()

@@ -3,7 +3,7 @@ import { v4 as uuid } from "uuid";
 export interface ProductProps {
   product_id?: string;
   name: string;
-  value: number;
+  value?: number;
   image?: string;
   editable: boolean;
   active: boolean;
@@ -12,7 +12,7 @@ export interface ProductProps {
 export default class Product {
   private _product_id?: string;
   private _name: string;
-  private _value: number;
+  private _value?: number;
   private _image?: string;
   private _active: boolean;
   private _editable: boolean;
