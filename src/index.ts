@@ -40,6 +40,7 @@ import UpdateTableUseCase from "./application/usecases/table/UpdateTableUseCase"
 import CreateUserUseCase from "./application/usecases/users/CreateUserUseCase";
 import DeleteUserUseCase from "./application/usecases/users/DeleteUserUseCase";
 import GetAllUseCase from "./application/usecases/users/GetAllUseCase";
+import GetUserByEmailUseCase from "./application/usecases/users/GetUserByEmailUseCase";
 import GetUsersByIdUseCase from "./application/usecases/users/GetUsersByIdUseCase";
 import UpdateUserUseCase from "./application/usecases/users/UpdateUserUseCase";
 import AuthController from "./infra/controllers/auth/AuthController";
@@ -132,14 +133,14 @@ async function main() {
   );
 
   const orderRepository = new OrderRepository(databaseConnection);
-  const createOrderUseCase = new CreateOrderUseCase(orderRepository);
+  const createOrderUseCase = new CreateOrderUseCase(orderRepository, userRepository);
   const updateOrderUseCase = new UpdateOrderUseCase(orderRepository);
   const deleteOrderUseCase = new DeleteOrderUseCase(orderRepository);
   const getAllOrderUseCase = new GetAllOrdersUseCase(orderRepository);
   const getAllOrdersByCustomerUseCase = new GetAllOrdersByCustomerUseCase(orderRepository);
   const getOrderByIdUseCase = new GetOrderByIdUseCase(orderRepository);
   const closeAccountUseCase = new CloseAccountUseCase(orderRepository);
-  const closeAccountWithoutCustomerUseCase = new CloseAccountWithoutCustomerUseCase(orderRepository);
+  const closeAccountWithoutCustomerUseCase = new CloseAccountWithoutCustomerUseCase(orderRepository, userRepository);
   const getOrdersToCloseOfTheDayUseCase = new GetOrdersToCloseOfTheDayUseCase(orderRepository);
   const partialPaymentUseCase = new PartialPaymentUseCase(orderRepository);
 
@@ -195,5 +196,16 @@ async function main() {
 
   httpServer.listen(3000);
 }
+
+process.on('uncaughtException', (error: Error) => {
+  console.log(JSON.stringify(error))
+  console.error(`Uncaught Exception: ${error.message}`);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+  console.error(`Unhandled Rejection at: ${promise}, reason: ${reason}`);
+  process.exit(1);
+ });
 
 main();

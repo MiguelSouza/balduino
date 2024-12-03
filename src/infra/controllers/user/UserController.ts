@@ -50,5 +50,6 @@ export default class UserController {
         return await getUserByIdUseCase.execute(params.userId);
       },
     );
+    
   }
 }

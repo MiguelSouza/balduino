@@ -177,10 +177,15 @@ export default class OrderRepository implements IOrderRepository {
   
     if (date) {
       const dateFormat = new Date(date)
+      dateFormat.setHours(0, 0, 0, 0);
       const formattedDate = dateFormat.toISOString().split('T')[0];
+
       query += ` AND o.created_at = '${formattedDate}'`;
     } else {
-      query += ` AND o.created_at >= CURRENT_DATE`;
+      const dateFormat = new Date();
+      dateFormat.setHours(0, 0, 0, 0);
+      const formattedDate = dateFormat.toISOString().split('T')[0];
+      query += ` AND o.created_at >= '${formattedDate}'`;
     }
   
     query += `
@@ -475,7 +480,7 @@ export default class OrderRepository implements IOrderRepository {
       payment_method: null,
       total_faturado: totalFaturado
     })
-    
+
     return {
       data: result,
       resume: {
