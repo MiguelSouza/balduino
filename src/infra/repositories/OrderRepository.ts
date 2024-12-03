@@ -177,14 +177,16 @@ export default class OrderRepository implements IOrderRepository {
   
     if (date) {
       const dateFormat = new Date(date)
-      dateFormat.setHours(0, 0, 0, 0);
       const formattedDate = dateFormat.toISOString().split('T')[0];
-
       query += ` AND o.created_at = '${formattedDate}'`;
     } else {
       const dateFormat = new Date();
-      dateFormat.setHours(0, 0, 0, 0);
-      const formattedDate = dateFormat.toISOString().split('T')[0];
+
+dateFormat.setHours(0, 0, 0, 0);
+
+// Formata a data no formato YYYY-MM-DD
+const formattedDate = dateFormat.toISOString().split('T')[0];
+      console.log(formattedDate)
       query += ` AND o.created_at >= '${formattedDate}'`;
     }
   
@@ -196,6 +198,7 @@ export default class OrderRepository implements IOrderRepository {
       END,
       o.order_id DESC;
     `;
+    //console.log(query)
     
     const result = await this.connection?.query(query, null);
     
@@ -415,7 +418,7 @@ export default class OrderRepository implements IOrderRepository {
                       -- Para o período diário, verifica a hora e a data
                       (EXTRACT(HOUR FROM o.updated_at) >= 10 AND o.updated_at::date = $1::date)
                       OR
-                      (EXTRACT(HOUR FROM o.updated_at) < 6 AND o.updated_at::date = ($1::date + INTERVAL '1 day')::date)
+                      (EXTRACT(HOUR FROM o.updated_at) < 9 AND o.updated_at::date = ($1::date + INTERVAL '1 day')::date)
                   )`}
           GROUP BY 
               o.payment_method
@@ -432,7 +435,7 @@ export default class OrderRepository implements IOrderRepository {
               balduino."order" o ON o.order_id = pp.order_id
           WHERE
               pp.payment_date >= $1::date + INTERVAL '7 hours'  -- Início às 7 da manhã do dia fornecido
-              AND pp.payment_date < $1::date + INTERVAL '1 day' + INTERVAL '6 hours'  -- Fim às 6 da manhã do dia seguinte
+              AND pp.payment_date < $1::date + INTERVAL '1 day' + INTERVAL '9 hours'  -- Fim às 6 da manhã do dia seguinte
              
           GROUP BY
               pp.payment_method
