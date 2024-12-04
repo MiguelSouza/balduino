@@ -362,14 +362,15 @@ export default class OrderRepository implements IOrderRepository {
 
   async closeAccountWithoutCustomer(order: Order){
     const result = await this.connection?.query(
-      `INSERT INTO balduino.order (order_id, status, payment_method, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      `INSERT INTO balduino.order (order_id, status, payment_method, created_at, updated_at,created_by)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [
         order.orderId,
         'paid',
         order.paymentMethod,
         order.createdAt.toISOString(),
-        order.updatedAt?.toISOString()
+        order.updatedAt?.toISOString(),
+        "18eb3400-ac43-4a04-a562-1ff4c6d542c5"
       ],
     );
 
