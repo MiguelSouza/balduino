@@ -362,8 +362,8 @@ export default class OrderRepository implements IOrderRepository {
 
   async closeAccountWithoutCustomer(order: Order){
     const result = await this.connection?.query(
-      `INSERT INTO balduino.order (order_id, status, payment_method, created_at, updated_at,created_by)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      `INSERT INTO balduino.order (order_id, status, payment_method, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [
         order.orderId,
         'paid',
@@ -384,6 +384,7 @@ export default class OrderRepository implements IOrderRepository {
     const formattedDate = dateParam.toISOString().split('T')[0];
 
     let queryParams: any[];
+    console.log(dateParam)
 
     if (filters.period === 'daily') {
         queryParams = [formattedDate];
@@ -407,7 +408,6 @@ export default class OrderRepository implements IOrderRepository {
           payment_method,
           SUM(total_faturado) AS total_faturado
       FROM (
-          -- Consulta para a tabela "order"
           SELECT 
               o.payment_method,                          
               SUM(op.quantity * op.price) AS total_faturado
