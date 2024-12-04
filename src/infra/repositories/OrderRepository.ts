@@ -174,32 +174,40 @@ export default class OrderRepository implements IOrderRepository {
     if (table) {
       query += ` AND t.name LIKE '%${table}%'`;
     }
-  
+    
     if (date) {
-      const dateFormat = new Date(date)
-      const formattedDate = dateFormat.toISOString().split('T')[0];
-      query += ` AND o.created_at = '${formattedDate}'`;
+      const dateFormat = new Date(date);
+      const formattedDate = dateFormat.toISOString().split('T')[0] + ' ' + dateFormat.toTimeString().split(' ')[0];
+  
+      query += `
+          AND (
+              (EXTRACT(HOUR FROM o.updated_at) >= 10 AND o.updated_at::date = '${formattedDate}'::date)
+              OR
+              (EXTRACT(HOUR FROM o.updated_at) < 9 AND o.updated_at::date = ('${formattedDate}'::date + INTERVAL '1 day')::date)
+          )`;
+      
+      
     } else {
       const dateFormat = new Date();
-
-dateFormat.setHours(0, 0, 0, 0);
-
-// Formata a data no formato YYYY-MM-DD
-const formattedDate = dateFormat.toISOString().split('T')[0];
-      console.log(formattedDate)
-      query += ` AND o.created_at >= '${formattedDate}'`;
-    }
+      const formattedDate = dateFormat.toISOString().split('T')[0] + ' ' + dateFormat.toTimeString().split(' ')[0];
   
+      query += `
+          AND (
+              (EXTRACT(HOUR FROM o.updated_at) >= 10 AND o.updated_at::date = '${formattedDate}'::date)
+              OR
+              (EXTRACT(HOUR FROM o.updated_at) < 9 AND o.updated_at::date = ('${formattedDate}'::date + INTERVAL '1 day')::date)
+          )`;
+
+    }
     query += `
-      ORDER BY 
-      CASE 
-        WHEN o.status = 'delivered' THEN 1
+    ORDER BY 
+    CASE 
+        WHEN o.status = 'pending' THEN 1
         ELSE 0
-      END,
-      o.order_id DESC;
-    `;
-    //console.log(query)
-    
+    END DESC,  -- 'pending' vai aparecer primeiro
+    o.order_number DESC; 
+`;
+
     const result = await this.connection?.query(query, null);
     
     const ordersMap = new Map<string, any>();
@@ -435,7 +443,7 @@ const formattedDate = dateFormat.toISOString().split('T')[0];
               balduino."order" o ON o.order_id = pp.order_id
           WHERE
               pp.payment_date >= $1::date + INTERVAL '7 hours'  -- Início às 7 da manhã do dia fornecido
-              AND pp.payment_date < $1::date + INTERVAL '1 day' + INTERVAL '9 hours'  -- Fim às 6 da manhã do dia seguinte
+              AND pp.payment_date < $1::date + INTERVAL '1 day' + INTERVAL '6 hours'  -- Fim às 6 da manhã do dia seguinte
              
           GROUP BY
               pp.payment_method
