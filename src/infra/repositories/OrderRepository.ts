@@ -369,8 +369,7 @@ export default class OrderRepository implements IOrderRepository {
         'paid',
         order.paymentMethod,
         order.createdAt.toISOString(),
-        order.updatedAt?.toISOString(),
-        order.createdBy
+        order.updatedAt?.toISOString()
       ],
     );
 

@@ -12,10 +12,9 @@ export default class CloseAccountWithoutCustomerUseCase {
   }
 
   async execute(order: any): Promise<void> {
-    const user: any = await this.userRepository?.getByEmail(order.created_by || '');
-    console.log(user)
+    //const user: any = await this.userRepository?.getByEmail(order.created_by || '');
+    //console.log(user)
     const orderEntity = new Order({
-      created_by: user?.user_id ?? null,
       products: order.products,
       payment_method: order.paymentMethod,
     });
