@@ -138,7 +138,7 @@ export default class OrderRepository implements IOrderRepository {
 
   async getAll(filters: any): Promise<any[]> {
     const { status, customer_name, table, date } = filters;
-
+  
     let query = `
       SELECT 
         o.order_id, 
@@ -158,8 +158,7 @@ export default class OrderRepository implements IOrderRepository {
       JOIN balduino.user u ON u.user_id = o.created_by
       WHERE c.active = true
     `;
-
-    // Filtro por status
+  
     if (status) {
       const statusArray = status.split(',').map((s: any) => s.trim());
       const statusList = statusArray.map((s: any) => `'${s}'`).join(', ');
@@ -168,56 +167,50 @@ export default class OrderRepository implements IOrderRepository {
       query += ` AND o.status != 'paid' AND o.status != 'canceled'`;
     }
   
-    // Filtro por nome do cliente
     if (customer_name) {
       query += ` AND c.name LIKE '%${customer_name}%'`;
     }
   
-    // Filtro por nome da mesa
     if (table) {
       query += ` AND t.name LIKE '%${table}%'`;
     }
-    
-    // Filtro por data
+  
     if (date) {
       const dateFormat = new Date(date);
       const formattedDate = dateFormat.toISOString().split('T')[0] + ' ' + dateFormat.toTimeString().split(' ')[0];
   
       query += `
-          AND (
-              (EXTRACT(HOUR FROM o.updated_at) >= 10 AND o.updated_at::date = '${formattedDate}'::date)
-              OR
-              (EXTRACT(HOUR FROM o.updated_at) < 9 AND o.updated_at::date = ('${formattedDate}'::date + INTERVAL '1 day')::date)
-          )`;
+        AND (
+          (EXTRACT(HOUR FROM o.updated_at) >= 10 AND o.updated_at::date = '${formattedDate}'::date)
+          OR
+          (EXTRACT(HOUR FROM o.updated_at) < 9 AND o.updated_at::date = ('${formattedDate}'::date + INTERVAL '1 day')::date)
+        )`;
     } else {
       const now = new Date();
       const currentHour = now.getHours();
-
+  
       let startDate, endDate;
-
-      // Se for entre 00:00 e 09:59, queremos pegar o período das 10h de ontem até as 6h de hoje
+  
+      // Se antes das 10h, começa às 10h de ontem até as 6h de hoje
       if (currentHour < 10) {
-        // Definindo a data de ontem, 10:00
         startDate = new Date(now);
-        startDate.setDate(now.getDate() - 1); // Ontem
-        startDate.setHours(10, 0, 0, 0); // Definindo para 10:00
-
-        // Definindo o fim do intervalo, 06:00 do dia atual
+        startDate.setDate(now.getDate() - 1); // Dia anterior
+        startDate.setHours(10, 0, 0, 0); // Início às 10h do dia anterior
+  
         endDate = new Date(now);
-        endDate.setHours(6, 0, 0, 0); // 06:00
-
+        endDate.setHours(6, 0, 0, 0); // Fim às 6h de hoje
+  
       } else {
-        // Se for após as 10h de hoje, queremos pegar o período das 10h de ontem até as 6h de hoje
+        // Se já passou das 10h, começa às 10h de hoje até as 6h de amanhã
         startDate = new Date(now);
-        startDate.setDate(now.getDate() - 1); // Ontem
-        startDate.setHours(10, 0, 0, 0); // Definindo para 10:00
-
-        // Definindo o fim do intervalo, 06:00 do dia atual
+        startDate.setHours(10, 0, 0, 0); // Início às 10h de hoje
+  
         endDate = new Date(now);
-        endDate.setHours(6, 0, 0, 0); // 06:00
+        endDate.setDate(now.getDate() + 1); // Dia seguinte
+        endDate.setHours(6, 0, 0, 0); // Fim às 6h de amanhã
       }
-
-      // Formatar as datas para o formato 'YYYY-MM-DD HH:mm:ss'
+  
+      // Formatação das datas no formato YYYY-MM-DD HH:mm:ss
       const formatDate = (date: Date) => {
         const year = date.getFullYear();
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -227,31 +220,31 @@ export default class OrderRepository implements IOrderRepository {
         const seconds = date.getSeconds().toString().padStart(2, '0');
         return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
       };
-
+  
       const formattedStartDate = formatDate(startDate);
       const formattedEndDate = formatDate(endDate);
-
+  
       query += `
         AND o.updated_at >= '${formattedStartDate}'::timestamp
         AND o.updated_at < '${formattedEndDate}'::timestamp
       `;
     }
-
-    // Ordem dos resultados
+  
     query += `
-        ORDER BY 
-        CASE 
-            WHEN o.status = 'pending' THEN 1
-            ELSE 0
-        END DESC,  -- 'pending' vai aparecer primeiro
-        o.order_number DESC; 
+      ORDER BY 
+      CASE 
+          WHEN o.status = 'pending' THEN 1
+          ELSE 0
+      END DESC,  -- 'pending' vai aparecer primeiro
+      o.order_number DESC; 
     `;
+  
     console.log(query);
-
+  
     const result = await this.connection?.query(query, null);
-    
+  
     const ordersMap = new Map<string, any>();
-    
+  
     result?.forEach((row: any) => {
       if (ordersMap.has(row.order_id)) {
         const order = ordersMap.get(row.order_id)!;
@@ -280,7 +273,8 @@ export default class OrderRepository implements IOrderRepository {
     });
   
     return Array.from(ordersMap.values());
-}
+  }
+  
 
   
 
@@ -411,7 +405,7 @@ export default class OrderRepository implements IOrderRepository {
         order.paymentMethod,
         order.createdAt.toISOString(),
         order.updatedAt?.toISOString(),
-        "18eb3400-ac43-4a04-a562-1ff4c6d542c5"
+        "68a7bf74-0908-441d-a8ed-c6e8a81c5c21"
       ],
     );
 
