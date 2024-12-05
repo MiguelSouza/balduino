@@ -159,22 +159,26 @@ export default class OrderRepository implements IOrderRepository {
       WHERE c.active = true
     `;
 
+    // Filtro por status
     if (status) {
-      const statusArray = status.split(',').map((s: any) => s.trim()); 
+      const statusArray = status.split(',').map((s: any) => s.trim());
       const statusList = statusArray.map((s: any) => `'${s}'`).join(', ');
       query += ` AND o.status in (${statusList})`;
     } else {
       query += ` AND o.status != 'paid' AND o.status != 'canceled'`;
     }
   
+    // Filtro por nome do cliente
     if (customer_name) {
       query += ` AND c.name LIKE '%${customer_name}%'`;
     }
   
+    // Filtro por nome da mesa
     if (table) {
       query += ` AND t.name LIKE '%${table}%'`;
     }
     
+    // Filtro por data
     if (date) {
       const dateFormat = new Date(date);
       const formattedDate = dateFormat.toISOString().split('T')[0] + ' ' + dateFormat.toTimeString().split(' ')[0];
@@ -185,28 +189,64 @@ export default class OrderRepository implements IOrderRepository {
               OR
               (EXTRACT(HOUR FROM o.updated_at) < 9 AND o.updated_at::date = ('${formattedDate}'::date + INTERVAL '1 day')::date)
           )`;
-      
-      
     } else {
-      const dateFormat = new Date();
-      const formattedDate = dateFormat.toISOString().split('T')[0] + ' ' + dateFormat.toTimeString().split(' ')[0];
-  
-      query += `
-          AND (
-              (EXTRACT(HOUR FROM o.updated_at) >= 10 AND o.updated_at::date = '${formattedDate}'::date)
-              OR
-              (EXTRACT(HOUR FROM o.updated_at) < 9 AND o.updated_at::date = ('${formattedDate}'::date + INTERVAL '1 day')::date)
-          )`;
+      const now = new Date();
+      const currentHour = now.getHours();
 
+      let startDate, endDate;
+
+      // Se for entre 00:00 e 09:59, queremos pegar o período das 10h de ontem até as 6h de hoje
+      if (currentHour < 10) {
+        // Definindo a data de ontem, 10:00
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 1); // Ontem
+        startDate.setHours(10, 0, 0, 0); // Definindo para 10:00
+
+        // Definindo o fim do intervalo, 06:00 do dia atual
+        endDate = new Date(now);
+        endDate.setHours(6, 0, 0, 0); // 06:00
+
+      } else {
+        // Se for após as 10h de hoje, queremos pegar o período das 10h de ontem até as 6h de hoje
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 1); // Ontem
+        startDate.setHours(10, 0, 0, 0); // Definindo para 10:00
+
+        // Definindo o fim do intervalo, 06:00 do dia atual
+        endDate = new Date(now);
+        endDate.setHours(6, 0, 0, 0); // 06:00
+      }
+
+      // Formatar as datas para o formato 'YYYY-MM-DD HH:mm:ss'
+      const formatDate = (date: Date) => {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const seconds = date.getSeconds().toString().padStart(2, '0');
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      };
+
+      const formattedStartDate = formatDate(startDate);
+      const formattedEndDate = formatDate(endDate);
+
+      query += `
+        AND o.updated_at >= '${formattedStartDate}'::timestamp
+        AND o.updated_at < '${formattedEndDate}'::timestamp
+      `;
     }
+
+    // Ordem dos resultados
     query += `
-    ORDER BY 
-    CASE 
-        WHEN o.status = 'pending' THEN 1
-        ELSE 0
-    END DESC,  -- 'pending' vai aparecer primeiro
-    o.order_number DESC; 
-`;
+        ORDER BY 
+        CASE 
+            WHEN o.status = 'pending' THEN 1
+            ELSE 0
+        END DESC,  -- 'pending' vai aparecer primeiro
+        o.order_number DESC; 
+    `;
+    console.log(query);
 
     const result = await this.connection?.query(query, null);
     
@@ -240,7 +280,8 @@ export default class OrderRepository implements IOrderRepository {
     });
   
     return Array.from(ordersMap.values());
-  }
+}
+
   
 
   async delete(orderId: string): Promise<void> {
