@@ -198,7 +198,7 @@ export default class OrderRepository implements IOrderRepository {
       startDate.setHours(10, 0, 0, 0); // Início às 10h do dia anterior
 
       endDate = new Date(now);
-      endDate.setHours(6, 0, 0, 0); // Fim às 6h de hoje
+      endDate.setHours(10, 0, 0, 0); // Fim às 6h de hoje
 
     } else {
       // Se já passou das 10h, começa às 10h de hoje até as 6h de amanhã
@@ -207,7 +207,7 @@ export default class OrderRepository implements IOrderRepository {
 
       endDate = new Date(now);
       endDate.setDate(now.getDate() + 1); // Dia seguinte
-      endDate.setHours(6, 0, 0, 0); // Fim às 6h de amanhã
+      endDate.setHours(10, 0, 0, 0);
     }
 
     // Formatação das datas no formato YYYY-MM-DD HH:mm:ss
