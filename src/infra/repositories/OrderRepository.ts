@@ -418,7 +418,7 @@ export default class OrderRepository implements IOrderRepository {
     const formattedDate = dateParam.toISOString().split('T')[0];
 
     let queryParams: any[];
-    console.log(dateParam)
+    
 
     if (filters.period === 'daily') {
         queryParams = [formattedDate];
@@ -438,55 +438,65 @@ export default class OrderRepository implements IOrderRepository {
 
     const result = await this.connection?.query(
       `
-      SELECT
-          payment_method,
-          SUM(total_faturado) AS total_faturado
-      FROM (
-          SELECT 
-              o.payment_method,                          
-              SUM(op.quantity * op.price) AS total_faturado
-          FROM 
-              balduino."order" o                                    
-          JOIN 
-              balduino.order_product op ON o.order_id = op.order_id
-          WHERE 
-              o.status = 'paid'   
-              ${filters.period === 'monthly' ? 
-                  ` AND (
-                      o.updated_at >= date_trunc('month', $1::date) + INTERVAL '10 hours'
-                      AND o.updated_at < date_trunc('month', $1::date + INTERVAL '1 month')
-                  )` : 
-                  `AND (
-                      -- Para o período diário, verifica a hora e a data
-                      (EXTRACT(HOUR FROM o.updated_at) >= 10 AND o.updated_at::date = $1::date)
-                      OR
-                      (EXTRACT(HOUR FROM o.updated_at) < 9 AND o.updated_at::date = ($1::date + INTERVAL '1 day')::date)
-                  )`}
-          GROUP BY 
-              o.payment_method
-        
-          UNION ALL
-        
-          -- Consulta para a tabela "partial_payment"
-          SELECT
-              pp.payment_method,
-              SUM(pp.value) AS total_faturado
-          FROM
-              balduino.partial_payment pp
-          JOIN
-              balduino."order" o ON o.order_id = pp.order_id
-          WHERE
-              pp.payment_date >= $1::date + INTERVAL '7 hours'  -- Início às 7 da manhã do dia fornecido
-              AND pp.payment_date < $1::date + INTERVAL '1 day' + INTERVAL '6 hours'  -- Fim às 6 da manhã do dia seguinte
-             
-          GROUP BY
-              pp.payment_method
-    
-      ) AS combined_results
-      GROUP BY 
-          payment_method
-      ORDER BY 
-          total_faturado DESC;
+     SELECT
+    payment_method,
+    SUM(total_faturado) AS total_faturado
+FROM (
+    -- Subconsulta para calcular o total de cada order com ajuste de partial payments
+    SELECT 
+        o.payment_method,                          
+        -- Calculando o total ajustado com base no valor de partial_payment
+        CASE 
+            WHEN pp.value IS NOT NULL THEN 
+                (SUM(op.quantity * op.price) - pp.value)  -- Subtrai o partial_payment do total da order
+            ELSE 
+                SUM(op.quantity * op.price)  -- Se não houver partial_payment, usa o total da order normalmente
+        END AS total_faturado
+    FROM 
+        balduino."order" o
+    JOIN 
+        balduino.order_product op ON o.order_id = op.order_id
+    LEFT JOIN 
+        balduino.partial_payment pp ON o.order_id = pp.order_id  -- Juntando com partial_payment para ajustar o valor
+    WHERE 
+        o.status = 'paid'
+        ${filters.period === 'monthly' ? 
+            `AND (
+                o.updated_at >= date_trunc('month', $1::date) + INTERVAL '10 hours'
+                AND o.updated_at < date_trunc('month', $1::date + INTERVAL '1 month')
+            )` : 
+            `AND (
+                -- Para o período diário, verifica a hora e a data
+                (EXTRACT(HOUR FROM o.updated_at) >= 10 AND o.updated_at::date = $1::date)
+                OR
+                (EXTRACT(HOUR FROM o.updated_at) < 9 AND o.updated_at::date = ($1::date + INTERVAL '1 day')::date)
+            )`}
+    GROUP BY 
+        o.payment_method, o.order_id, pp.value  -- Agrupando por order_id para garantir que o ajuste seja feito corretamente
+
+    UNION ALL
+
+    -- Consulta para a tabela "partial_payment"
+    SELECT
+        pp.payment_method,
+        SUM(pp.value) AS total_faturado
+    FROM
+        balduino.partial_payment pp
+    JOIN
+        balduino."order" o ON o.order_id = pp.order_id
+    WHERE
+        pp.payment_date >= $1::date + INTERVAL '7 hours'  -- Início às 7 da manhã do dia fornecido
+        AND pp.payment_date < $1::date + INTERVAL '1 day' + INTERVAL '6 hours'  -- Fim às 6 da manhã do dia seguinte
+    GROUP BY
+        pp.payment_method
+
+) AS combined_results
+GROUP BY 
+    payment_method
+ORDER BY 
+    total_faturado DESC;
+
+
       `,
       queryParams
     );
@@ -516,8 +526,10 @@ export default class OrderRepository implements IOrderRepository {
       `,
       queryParams
     );
-
     const totalFaturado = result.reduce((total: any, current:any) => {
+      console.log(total)
+      console.log(current)
+   
       return total + current.total_faturado;
     }, 0);
 
@@ -535,7 +547,23 @@ export default class OrderRepository implements IOrderRepository {
     };
   }
 
-
+  /*async transferBill(transferBill: any): Promise<any> {
+    const result = await this.connection?.query(
+      `INSERT INTO balduino.customer_balance_transfer
+        (transfer_id, from_customer_id, to_customer_id, status, value, transfer_date) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [
+        transferBill.transferBillId,
+        transferBill.fromCustomerId,
+        transferBill.toCustomerId,
+        transferBill.status,
+        transferBill.value,
+        transferBill.transferDate.toString(),
+      ]
+    );
+    
+    return result;
+  }*/
 
   async payPartial(partialPayment: PartialPayment): Promise<PartialPayment> {
     const result = await this.connection?.query(
