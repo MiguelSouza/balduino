@@ -53,8 +53,15 @@ export default class ExpenseRepository implements IExpenseRepository {
   }
 
   async getAll(query: any): Promise<Expense[]> {
-    return this.connection?.query("SELECT * FROM balduino.expense", null);
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+  
+    return this.connection?.query(
+      "SELECT * FROM balduino.expense WHERE EXTRACT(MONTH FROM created_at) = $1 AND EXTRACT(YEAR FROM created_at) = $2",
+      [currentMonth, currentYear]
+    );
   }
+  
 
   async delete(expenseId: string): Promise<void> {
     this.connection?.query(
