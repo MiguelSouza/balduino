@@ -25,13 +25,14 @@ export default class MonthlyPayerRepository implements IMonthlyPayerRepository {
   }
 
   async update(monthlyPayer: MonthlyPayer): Promise<void> {
+    console.log(monthlyPayer)
     await this.connection?.query(
       `UPDATE balduino.monthly_payers
             SET name = $1, value = $2, updated_at = $3
             WHERE monthly_payer_id = $4`,
       [
         monthlyPayer.name,
-        monthlyPayer.value,,
+        monthlyPayer.value,
         new Date(),
         monthlyPayer.monthlyPayerId,
       ],
@@ -114,6 +115,7 @@ export default class MonthlyPayerRepository implements IMonthlyPayerRepository {
       balduino.monthly_payers mp
   LEFT JOIN 
       balduino.payments p ON mp.monthly_payer_id = p.monthly_payer_id
+  WHERE mp.active = true
   GROUP BY 
       mp.monthly_payer_id, mp.name, mp.value;
   
@@ -122,7 +124,7 @@ export default class MonthlyPayerRepository implements IMonthlyPayerRepository {
   
   async delete(monthlyPayerId: string): Promise<void> {
     this.connection?.query(
-      "delete from balduino.monthly_payers where monthly_payer_id = $1",
+      "update balduino.monthly_payers set active = false where monthly_payer_id = $1",
       [monthlyPayerId],
     );
   }
