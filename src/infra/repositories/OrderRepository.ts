@@ -143,6 +143,7 @@ export default class OrderRepository implements IOrderRepository {
     SELECT 
       o.order_id, 
       o.order_number,
+      o.created_at,
       c.name as customer_name, 
       o.status, 
       p.product_id, 
@@ -256,6 +257,7 @@ export default class OrderRepository implements IOrderRepository {
     } else {
       ordersMap.set(row.order_id, {
         order_id: row.order_id,
+        createdAt: row.created_at,
         delivered_by: row.delivered_by,
         orderNumber: row.order_number,
         customerName: row.customer_name,
@@ -300,6 +302,7 @@ export default class OrderRepository implements IOrderRepository {
       SELECT 
         o.order_id, 
         o.order_number,
+        o.created_at,
         c.name AS customer_name,
         c.customer_id AS customer_id, 
         t.table_id AS table_id, 
@@ -349,6 +352,7 @@ export default class OrderRepository implements IOrderRepository {
         customer.orders.push({
           order_id: row.order_id,
           orderNumber: row.order_number,
+          createdAt: row.created_at,
           status: row.status,
           tableName: row.table_name,
           products: [{
