@@ -16,7 +16,6 @@ export default class CreateOrderUseCase {
   async execute(order: OrderDto): Promise<CreateResponseDto> {
     try {
       const user: any = await this.userRepository?.getById(order.created_by || '');
-      console.log(user)
       const orderEntity = new Order({
         customer_id: order.customer_id,
         table_id: order.table_id,
