@@ -25,8 +25,8 @@ export default class ExpenseRepository implements IExpenseRepository {
   async update(expense: Expense): Promise<void> {
     await this.connection?.query(
       `UPDATE balduino.expense
-            SET description = $1, value = $2, editable = $3, updated_at = $4
-            WHERE expense_id = $5`,
+            SET description = $1, value = $2, updated_at = $3
+            WHERE expense_id = $4`,
       [
         expense.description,
         expense.value,
