@@ -240,7 +240,6 @@ export default class OrderRepository implements IOrderRepository {
     o.order_number DESC; 
   `;
 
-  console.log(query);
 
   const result = await this.connection?.query(query, null);
 
@@ -408,7 +407,7 @@ export default class OrderRepository implements IOrderRepository {
         order.paymentMethod,
         order.createdAt.toISOString(),
         order.updatedAt?.toISOString(),
-        "18eb3400-ac43-4a04-a562-1ff4c6d542c5"
+        order.createdBy
       ],
     );
 
@@ -531,8 +530,7 @@ ORDER BY
       queryParams
     );
     const totalFaturado = result.reduce((total: any, current:any) => {
-      console.log(total)
-      console.log(current)
+      
    
       return total + current.total_faturado;
     }, 0);

@@ -25,7 +25,6 @@ export default class MonthlyPayerRepository implements IMonthlyPayerRepository {
   }
 
   async update(monthlyPayer: MonthlyPayer): Promise<void> {
-    console.log(monthlyPayer)
     await this.connection?.query(
       `UPDATE balduino.monthly_payers
             SET name = $1, value = $2, updated_at = $3

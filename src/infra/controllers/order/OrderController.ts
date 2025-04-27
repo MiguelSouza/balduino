@@ -117,5 +117,14 @@ export default class OrderController {
         return await partialPaymentUseCase.execute(body);
       },
     );
+
+    httpServer.register(
+      "post",
+      "/transfer",
+      [jwtGuard],
+      async (params: any, body: any) => {
+        return await partialPaymentUseCase.execute(body);
+      },
+    );
   }
 }

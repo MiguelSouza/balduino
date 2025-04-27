@@ -61,7 +61,6 @@ export default class PaymentMonthlyUseCase {
         nextPayment: responseNextPayment,
       };
     } catch (err: any) {
-      console.log(err)
       return {
         payment: undefined,
         errorMessage: err.message,
