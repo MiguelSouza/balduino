@@ -429,11 +429,8 @@ export default class OrderRepository implements IOrderRepository {
     } else if (filters.period === 'monthly') {
       let startOfMonth;
 
-      if (dateParam.getDate() === new Date(dateParam.getFullYear(), dateParam.getMonth() + 1, 0).getDate()) {
-          startOfMonth = new Date(dateParam.getFullYear(), dateParam.getMonth() + 1, 1);
-      } else {
-          startOfMonth = new Date(dateParam.getFullYear(), dateParam.getMonth(), 1);
-      }
+      startOfMonth = new Date(Date.UTC(dateParam.getUTCFullYear(), dateParam.getUTCMonth(), 1));
+      
       const formattedStartOfMonth = startOfMonth.toISOString().split('T')[0];
       queryParams = [formattedStartOfMonth];
     } else {
