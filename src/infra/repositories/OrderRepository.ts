@@ -419,7 +419,8 @@ export default class OrderRepository implements IOrderRepository {
   async getOrdersToClosing(filters: any): Promise<any> {
     const dateParam = filters.date ? new Date(filters.date) : new Date();
     const formattedDate = dateParam.toISOString().split('T')[0];
-
+    console.log('-----', dateParam)
+    console.log('-----', filters)
     let queryParams: any[];
     
 
