@@ -419,8 +419,7 @@ export default class OrderRepository implements IOrderRepository {
   async getOrdersToClosing(filters: any): Promise<any> {
     const dateParam = filters.date ? new Date(filters.date) : new Date();
     const formattedDate = dateParam.toISOString().split('T')[0];
-    console.log('-----', dateParam)
-    console.log('-----', filters)
+    
     let queryParams: any[];
     
 
@@ -430,7 +429,7 @@ export default class OrderRepository implements IOrderRepository {
       let startOfMonth;
 
       startOfMonth = new Date(Date.UTC(dateParam.getUTCFullYear(), dateParam.getUTCMonth(), 1));
-      
+
       const formattedStartOfMonth = startOfMonth.toISOString().split('T')[0];
       queryParams = [formattedStartOfMonth];
     } else {
