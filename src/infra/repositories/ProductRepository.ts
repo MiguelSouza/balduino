@@ -59,7 +59,30 @@ export default class ProductRepository implements IProductRepository {
   }
 
   async getAll(query: any): Promise<Product[]> {
-    return this.connection?.query("SELECT * FROM balduino.product", null);
+    return this.connection?.query(`
+        SELECT 
+            p.product_id,
+            p.name,
+            p.value,
+            p.image,
+            p.active,
+            p.created_at,
+            p.updated_at,
+            p.editable,
+            SUM(op.quantity) AS total_vendido
+        FROM 
+            balduino.order_product op
+        JOIN 
+            balduino.order o ON o.order_id = op.order_id
+        JOIN 
+            balduino.product p ON p.product_id = op.product_id
+        WHERE 
+            o.status = 'paid'
+        GROUP BY 
+            p.product_id, p.name, p.value, p.image, p.active, p.created_at, p.updated_at, p.editable
+        ORDER BY 
+            total_vendido DESC;
+      `, null);
   }
 
   async delete(productId: string): Promise<void> {
