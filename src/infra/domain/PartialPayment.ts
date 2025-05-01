@@ -4,6 +4,7 @@ export interface PartialPaymentProps {
   partial_payment_id?: string;
   order_id: string;
   payment_method?: string;
+  type?: string;
   payment_date?: Date;
   value: number;
 }
@@ -12,6 +13,7 @@ export default class PartialPayment {
   private _partialPaymentId: string;
   private _orderId: string;
   private _paymentMethod?: string;
+  private _type?: string;
   private _createdAt: Date;
   private _updatedAt?: Date;
   private _paymentDate?: Date;
@@ -21,6 +23,7 @@ export default class PartialPayment {
     this._partialPaymentId = props.partial_payment_id ?? uuid();
     this._orderId = props.order_id;
     this._paymentMethod = props.payment_method;
+    this._type = props.type;
     this._paymentDate = props.payment_date;
     this._value = props.value;
     this._createdAt = new Date();
@@ -45,6 +48,10 @@ export default class PartialPayment {
 
   get value() {
     return this._value;
+  }
+
+  get type() {
+    return this._type;
   }
 
   get createdAt() {

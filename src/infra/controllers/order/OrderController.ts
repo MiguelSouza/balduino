@@ -6,10 +6,10 @@ import GetAllOrdersByCustomerUseCase from "../../../application/usecases/order/G
 import GetAllOrdersUseCase from "../../../application/usecases/order/GetAllOrdersUseCase";
 import GetOrderByIdUseCase from "../../../application/usecases/order/GetOrderById";
 import GetOrdersToCloseOfTheDayUseCase from "../../../application/usecases/order/GetOrdersToCloseOfTheDayUseCase";
+import GetPartialPaymentByTypeUseCase from "../../../application/usecases/order/GetPartialPaymentByTypeUseCase";
 import PartialPaymentUseCase from "../../../application/usecases/order/PartialPaymentUseCase";
 import UpdateOrderUseCase from "../../../application/usecases/order/UpdateOrderUseCase";
 import { jwtGuard } from "../../AuthGuard/jwtGuard";
-import PartialPayment from "../../domain/PartialPayment";
 import HttpServer from "../../http/HttpServer";
 import OrderDto from "./dto/OrderDto";
 
@@ -26,6 +26,7 @@ export default class OrderController {
     closeAccountWithoutCustomerUseCase: CloseAccountWithoutCustomerUseCase,
     getOrdersToCloseOfTheDayUseCase: GetOrdersToCloseOfTheDayUseCase,
     partialPaymentUseCase: PartialPaymentUseCase,
+    getPartialPaymentByTypeUseCase: GetPartialPaymentByTypeUseCase
   ) {
     httpServer.register(
       "post",
@@ -115,6 +116,15 @@ export default class OrderController {
       [jwtGuard],
       async (params: any, body: any) => {
         return await partialPaymentUseCase.execute(body);
+      },
+    );
+
+    httpServer.register(
+      "get",
+      "/partialPay/:type",
+      [jwtGuard],
+      async (params: any) => {
+        return await getPartialPaymentByTypeUseCase.execute(params.type);
       },
     );
 

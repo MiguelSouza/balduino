@@ -24,6 +24,7 @@ import GetAllOrdersByCustomerUseCase from "./application/usecases/order/GetAllOr
 import GetAllOrdersUseCase from "./application/usecases/order/GetAllOrdersUseCase";
 import GetOrderByIdUseCase from "./application/usecases/order/GetOrderById";
 import GetOrdersToCloseOfTheDayUseCase from "./application/usecases/order/GetOrdersToCloseOfTheDayUseCase";
+import GetPartialPaymentByTypeUseCase from "./application/usecases/order/GetPartialPaymentByTypeUseCase";
 import PartialPaymentUseCase from "./application/usecases/order/PartialPaymentUseCase";
 import UpdateOrderUseCase from "./application/usecases/order/UpdateOrderUseCase";
 import CreateProductUseCase from "./application/usecases/product/CreateProductUseCase";
@@ -142,6 +143,7 @@ async function main() {
   const closeAccountWithoutCustomerUseCase = new CloseAccountWithoutCustomerUseCase(orderRepository, userRepository);
   const getOrdersToCloseOfTheDayUseCase = new GetOrdersToCloseOfTheDayUseCase(orderRepository);
   const partialPaymentUseCase = new PartialPaymentUseCase(orderRepository);
+  const getPartialPaymentByTypeUseCase = new GetPartialPaymentByTypeUseCase(orderRepository);
 
   new OrderController(
     httpServer,
@@ -154,7 +156,8 @@ async function main() {
     closeAccountUseCase,
     closeAccountWithoutCustomerUseCase,
     getOrdersToCloseOfTheDayUseCase,
-    partialPaymentUseCase
+    partialPaymentUseCase,
+    getPartialPaymentByTypeUseCase
   );
 
   const expenseRepository = new ExpenseRepository(databaseConnection);

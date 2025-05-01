@@ -192,26 +192,23 @@ export default class OrderRepository implements IOrderRepository {
 
     let startDate, endDate;
 
-    // Se antes das 10h, começa às 10h de ontem até as 6h de hoje
     if (currentHour < 10) {
       startDate = new Date(now);
-      startDate.setDate(now.getDate() - 1); // Dia anterior
-      startDate.setHours(10, 0, 0, 0); // Início às 10h do dia anterior
+      startDate.setDate(now.getDate() - 1); 
+      startDate.setHours(10, 0, 0, 0);
 
       endDate = new Date(now);
-      endDate.setHours(10, 0, 0, 0); // Fim às 6h de hoje
+      endDate.setHours(10, 0, 0, 0);
 
     } else {
-      // Se já passou das 10h, começa às 10h de hoje até as 6h de amanhã
       startDate = new Date(now);
-      startDate.setHours(10, 0, 0, 0); // Início às 10h de hoje
+      startDate.setHours(10, 0, 0, 0);
 
       endDate = new Date(now);
-      endDate.setDate(now.getDate() + 1); // Dia seguinte
+      endDate.setDate(now.getDate() + 1);
       endDate.setHours(10, 0, 0, 0);
     }
 
-    // Formatação das datas no formato YYYY-MM-DD HH:mm:ss
     const formatDate = (date: Date) => {
       const year = date.getFullYear();
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -323,7 +320,7 @@ export default class OrderRepository implements IOrderRepository {
       ORDER BY o.order_number, p.product_id;
     `, [customerId, 'delivered']);
 
-    const customersOrdersList: { customerId: string, tableId: string, customerName: string, orders: any[], totalAmount: number }[] = [];
+    const customersOrdersList: { customerId: string, tableId: string, customerName: string, orders: any[], totalAmount: number, totalOrder: number }[] = [];
     
     result?.forEach((row: any) => {
       const customerName = row.customer_name;
@@ -338,6 +335,7 @@ export default class OrderRepository implements IOrderRepository {
           tableId: row.table_id,
           orders: [],
           totalAmount: 0,
+          totalOrder: 0
         };
         customersOrdersList.push(customer);
       }
@@ -365,6 +363,7 @@ export default class OrderRepository implements IOrderRepository {
         });
     
         customer.totalAmount += (totalProductValue - totalPartialPayment);
+        customer.totalOrder += totalProductValue;
       } else {
         customer.orders[orderIndex].products.push({
           productId: row.product_id,
@@ -376,10 +375,12 @@ export default class OrderRepository implements IOrderRepository {
         if (customer.orders[orderIndex].partialPaymentApplied === 0 && totalPartialPayment > 0) {
           customer.orders[orderIndex].totalValue += totalProductValue - totalPartialPayment;
           customer.totalAmount += (totalProductValue - totalPartialPayment);
+          customer.totalOrder += totalProductValue;
           customer.orders[orderIndex].partialPaymentApplied = totalPartialPayment;
         } else {
           customer.orders[orderIndex].totalValue += totalProductValue;
           customer.totalAmount += totalProductValue;
+          customer.totalOrder += totalProductValue;
         }
       }
     });
@@ -567,14 +568,15 @@ ORDER BY
   async payPartial(partialPayment: PartialPayment): Promise<PartialPayment> {
     const result = await this.connection?.query(
       `INSERT INTO balduino.partial_payment 
-        (partial_payment_id, order_id, payment_method, payment_date, value, created_at, updated_at) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        (partial_payment_id, order_id, payment_method, payment_date, value, type, created_at, updated_at) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
         partialPayment.partialPaymentId,
         partialPayment.orderId,
         partialPayment.paymentMethod,
         partialPayment.paymentDate,
         partialPayment.value,
+        partialPayment.type,
         partialPayment.createdAt.toISOString(),
         partialPayment.updatedAt?.toISOString()
       ]
@@ -583,6 +585,20 @@ ORDER BY
     return result;
   }
 
-
+  async getPartialPaymentByType(type: string): Promise<PartialPayment | null> {
+    const result = await this.connection?.query(
+      "SELECT * FROM balduino.partial_payment WHERE type = $1",
+      [type],
+    );
+  
+    if (result && result.length > 0) {
+      const total = result.reduce((sum: any, item: any) => sum + Number(item.value || 0), 0);
+      const first = result[0];
+      first.value = total;
+      return first;
+    }
+  
+    return null;
+  }
   
 }

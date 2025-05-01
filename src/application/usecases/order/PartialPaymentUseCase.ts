@@ -13,6 +13,7 @@ export default class PartialPaymentUseCase {
       payment_method: partialPayment.paymentMethod,
       value: partialPayment.value,
       order_id: partialPayment.orderId,
+      type: partialPayment.type,
       payment_date: new Date(),
     });
     await this.orderRepository?.payPartial(partialPaymentEntity);
