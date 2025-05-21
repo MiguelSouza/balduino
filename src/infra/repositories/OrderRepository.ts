@@ -1,15 +1,20 @@
-import { ParameterizedQuery } from "pg-promise";
 import IOrderRepository from "../../application/repositories/OrderRepository";
 import DatabaseConnection from "../database/DatabaseConnection";
-import Order from "../domain/Order";
+import Order, { OrderStatus } from "../domain/Order";
 import { v4 as uuid } from "uuid";
 import PartialPayment from "../domain/PartialPayment";
+import CreditPayment from "../domain/CreditPayment";
+import CreditPaymentUsage from "../domain/CreditPaymentUsage";
+import CustomerRepository from "./CustomerRepository";
 
 export default class OrderRepository implements IOrderRepository {
   connection?: DatabaseConnection;
-
-  constructor(connection: DatabaseConnection) {
+  customerRepository: CustomerRepository;
+  constructor(connection: DatabaseConnection,
+    customerRepository: CustomerRepository
+  ) {
     this.connection = connection;
+    this.customerRepository = customerRepository;
   }
 
   getByCustomer(customerId: string): Promise<Order> {
@@ -21,8 +26,8 @@ export default class OrderRepository implements IOrderRepository {
 
   async save(order: Order): Promise<Order> {
     const result = await this.connection?.query(
-      `INSERT INTO balduino.order (order_id, customer_id, table_id, status, created_at, updated_at,created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      `INSERT INTO balduino.order (order_id, customer_id, table_id, status, created_at, updated_at,created_by, credit_destination)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
         order.orderId,
         order.customerId,
@@ -30,11 +35,13 @@ export default class OrderRepository implements IOrderRepository {
         order.status || null,
         order.createdAt.toISOString(),
         order.updatedAt?.toISOString(),
-        order.createdBy
+        order.createdBy,
+        order.creditDestination
       ],
     );
 
     await this.saveOrderProducts(order.orderId, order.products);
+
     return result;
   }
 
@@ -112,6 +119,54 @@ export default class OrderRepository implements IOrderRepository {
       }
     }
   }
+  
+  async payCreditOrder(creditPaymentUsage: CreditPaymentUsage): Promise<void> {
+    const orders = await this.getAllOrdersByCustomer(creditPaymentUsage.customerId || '');
+    const orderTotal = orders?.[0]?.totalAmount || 0;
+
+    const result = await this.connection?.query(
+      `
+      SELECT
+        COALESCE(SUM(cp.value), 0) - COALESCE(SUM(cu.value), 0) AS total
+      FROM
+        balduino.credit_payment cp
+      LEFT JOIN
+        balduino.customer_credit_usage cu ON cp.customer_destination_id = cu.customer_id
+      WHERE
+        cp.customer_destination_id = $1
+      `,
+      [creditPaymentUsage.customerId]
+    );
+
+    const availableCredit = result?.[0]?.total || 0;
+
+    if (availableCredit > 0 && orderTotal > 0) {
+      
+      const valueToSave = Math.min(orderTotal, availableCredit);
+
+      
+      await this.connection?.query(
+        `INSERT INTO balduino.customer_credit_usage (
+            usage_id,
+            customer_id,
+            value,
+            created_at,
+            updated_at
+        ) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [
+          creditPaymentUsage.creditPaymentUsageId,
+          creditPaymentUsage.customerId,
+          valueToSave,
+          creditPaymentUsage.createdAt.toISOString(),
+          creditPaymentUsage.updatedAt?.toISOString(),
+        ]
+      );
+
+      console.log('Crédito usado registrado:', valueToSave);
+    } else {
+      console.log('Nenhum crédito usado ou crédito insuficiente para registrar.');
+    }
+  }
 
   async getById(orderId: string): Promise<Order> {
     const result = await this.connection?.query(
@@ -157,7 +212,7 @@ export default class OrderRepository implements IOrderRepository {
     JOIN balduino.table t ON t.table_id = o.table_id
     JOIN balduino.product p ON p.product_id = op.product_id
     JOIN balduino.user u ON u.user_id = o.created_by
-    WHERE c.active = true
+    WHERE c.active = true and p.type = 'common'
   `;
 
   if (status) {
@@ -211,7 +266,6 @@ export default class OrderRepository implements IOrderRepository {
       endDate.setHours(10, 0, 0, 0);
     }
 
-    // Formatação das datas no formato YYYY-MM-DD HH:mm:ss
     const formatDate = (date: Date) => {
       const year = date.getFullYear();
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -306,9 +360,11 @@ export default class OrderRepository implements IOrderRepository {
         c.customer_id AS customer_id, 
         t.table_id AS table_id, 
         o.status, 
+        o.credit_destination, 
         p.product_id, 
         p.name AS product_name, 
         p.value AS product_value, 
+        p.type, 
         op.quantity,
         op.price,
         t.name AS table_name,
@@ -358,7 +414,9 @@ export default class OrderRepository implements IOrderRepository {
             productId: row.product_id,
             name: row.product_name,
             quantity: row.quantity,
-            value: row.price
+            value: row.price,
+            type: row.type,
+            creditDestination: row.credit_destination
           }],
           totalValue: totalProductValue - totalPartialPayment,
           partialPaymentApplied: totalPartialPayment > 0 ? totalPartialPayment : 0,
@@ -370,7 +428,9 @@ export default class OrderRepository implements IOrderRepository {
           productId: row.product_id,
           name: row.product_name,
           quantity: row.quantity,
-          value: row.price
+          value: row.price,
+          type: row.type,
+          creditDestination: row.credit_destination
         });
     
         if (customer.orders[orderIndex].partialPaymentApplied === 0 && totalPartialPayment > 0) {
@@ -389,6 +449,12 @@ export default class OrderRepository implements IOrderRepository {
 
 
   async closeAccount(customerId: string, paymentMethod: string){
+    const creditPaymentUsage = new CreditPaymentUsage({
+      customer_id: customerId,
+      value: 0,
+    })
+    await this.payCreditOrder(creditPaymentUsage)
+
     await this.connection?.query(
       `UPDATE balduino.order 
        SET status = $1, updated_at = $2, payment_method = $3
@@ -583,6 +649,99 @@ ORDER BY
     return result;
   }
 
+  async getCustomerById(customerId: string): Promise<any> {
+    
+      const result = await this.connection?.query(
+        `
+         SELECT c.customer_id, c.name, c.phone, c.active, c.created_at, c.updated_at,
+          array_agg(
+              json_build_object('table_id', t.table_id, 'table_name', t.name, 'day', ct.day_of_week)
+            ) AS customerTables
+          FROM balduino.customer c
+          LEFT JOIN balduino.customer_table ct ON c.customer_id = ct.customer_id
+          LEFT JOIN balduino.table t ON t.table_id = ct.table_id
+          WHERE c.customer_id = $1
+          GROUP BY c.customer_id, c.name, c.phone, c.active, c.created_at, c.updated_at
+        `,
+        [customerId],
+      );
+      
+      return result;
+    
+  }
 
+  async getProductByType(type: string): Promise<any> {
+    
+    const result = await this.connection?.query(
+      `
+       SELECT p.product_id
+       FROM balduino.product p
+       WHERE p.type = $1
+      `,
+      [type],
+    );
+    
+    return result;
+  
+  }
+
+  async payCredit(creditPayment: CreditPayment): Promise<CreditPayment> {
+    const result = await this.connection?.query(
+      `INSERT INTO balduino.credit_payment 
+        (credit_payment_id, customer_origin_id, customer_destination_id, value, created_at, updated_at) 
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        creditPayment.creditPaymentId,
+        creditPayment.customerOriginId,
+        creditPayment.customerDestinationId,
+        creditPayment.value,
+        creditPayment.createdAt.toISOString(),
+        creditPayment.updatedAt?.toISOString()
+      ]
+    );
+    
+    const customer = await this.getCustomerById(creditPayment.customerOriginId || creditPayment.customerId || '');
+    const product = await this.getProductByType('credit');
+   
+    const orderEntity = new Order({
+      customer_id: customer[0].customer_id,
+      table_id: customer[0].customertables[0].table_id,
+      status: OrderStatus.DELIVERED,
+      created_by: creditPayment.createdBy,
+      credit_destination: customer[0].name,
+      products: [{
+        productId: product[0].product_id,
+        quantity: 1,
+        price: creditPayment.value
+      }]
+    })
+    const orderResult = await this.save(orderEntity);
+
+    return result?.[0];
+  }
+
+  async getCreditByCustomer(customerId: string): Promise<number> {
+    const result = await this.connection?.query(
+      `
+      SELECT
+        COALESCE(cp_total.total, 0) - COALESCE(cu_total.total, 0) AS total
+      FROM
+        (
+          SELECT SUM(value) AS total
+          FROM balduino.credit_payment
+          WHERE customer_destination_id = $1
+        ) cp_total,
+        (
+          SELECT SUM(value) AS total
+          FROM balduino.customer_credit_usage
+          WHERE customer_id = $1
+        ) cu_total
+      `,
+      [customerId]
+    );
+  
+    return result?.[0]?.total ?? 0;
+  }
+  
   
 }

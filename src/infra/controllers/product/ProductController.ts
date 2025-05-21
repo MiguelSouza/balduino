@@ -30,7 +30,6 @@ export default class ProductController {
       "/product",
       [jwtGuard, upload.single('image')],
       async (params: any, body: ProductDto, query: any, file: any) => {
-        
         let urlImage = '';
         if(file){
           urlImage = await uploadImageUseCase.execute({ ...file  })
