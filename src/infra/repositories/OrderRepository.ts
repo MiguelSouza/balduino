@@ -9,12 +9,12 @@ import CustomerRepository from "./CustomerRepository";
 
 export default class OrderRepository implements IOrderRepository {
   connection?: DatabaseConnection;
-  customerRepository: CustomerRepository;
+
   constructor(connection: DatabaseConnection,
-    customerRepository: CustomerRepository
+
   ) {
     this.connection = connection;
-    this.customerRepository = customerRepository;
+
   }
 
   getByCustomer(customerId: string): Promise<Order> {
