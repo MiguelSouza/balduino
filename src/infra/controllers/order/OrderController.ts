@@ -13,6 +13,7 @@ import { jwtGuard } from "../../AuthGuard/jwtGuard";
 import HttpServer from "../../http/HttpServer";
 import OrderDto from "./dto/OrderDto";
 import GetCreditByCustomerUseCase from "../../../application/usecases/order/GetCreditByCustomerUseCase";
+import TransferProductUseCase from "../../../application/usecases/order/TransferProductUseCase";
 
 export default class OrderController {
   constructor(
@@ -28,7 +29,8 @@ export default class OrderController {
     getOrdersToCloseOfTheDayUseCase: GetOrdersToCloseOfTheDayUseCase,
     partialPaymentUseCase: PartialPaymentUseCase,
     creditPaymentUseCase: CreditPaymentUseCase,
-    getCreditByCustomerUseCase: GetCreditByCustomerUseCase
+    getCreditByCustomerUseCase: GetCreditByCustomerUseCase,
+    transferProductUseCase: TransferProductUseCase
   ) {
     httpServer.register(
       "post",
@@ -144,7 +146,7 @@ export default class OrderController {
       "/transfer",
       [jwtGuard],
       async (params: any, body: any) => {
-        return await partialPaymentUseCase.execute(body);
+        return await transferProductUseCase.execute(body);
       },
     );
   }

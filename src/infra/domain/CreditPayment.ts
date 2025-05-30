@@ -7,6 +7,7 @@ export interface CreditPaymentProps {
   customer_id?: string;
   customer_origin_id?: string;
   customer_destination_id?: string;
+  payment_method?: string;
   created_by?: string;
 }
 
@@ -18,6 +19,7 @@ export default class CreditPayment {
   private _createdBy?: string;
   private _value: number;
   private _customerOriginId?: string;
+  private _paymentMethod?: string;
   private _customerDestinationId?: string;
 
   constructor(props: CreditPaymentProps) {
@@ -27,6 +29,7 @@ export default class CreditPayment {
     this._customerId = props.customer_id;
     this._customerOriginId = props.customer_origin_id;
     this._customerDestinationId = props.customer_destination_id;
+    this._paymentMethod = props.payment_method,
     this._createdAt = new Date();
     this._updatedAt = new Date();
   }
@@ -61,5 +64,9 @@ export default class CreditPayment {
 
   get customerId() {
     return this._customerId;
+  }
+
+  get paymentMethod() {
+    return this._paymentMethod;
   }
 }

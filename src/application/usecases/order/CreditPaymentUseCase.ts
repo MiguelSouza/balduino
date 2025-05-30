@@ -13,6 +13,7 @@ export default class CreditPaymentUseCase {
       customer_destination_id: creditPayment.customerDestinationId,
       customer_origin_id: creditPayment.customerOriginId,
       value: creditPayment.value,
+      payment_method: creditPayment.paymentMethod,
       customer_id: creditPayment.customerId,
       created_by: creditPayment.createdBy
     });

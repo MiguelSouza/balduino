@@ -4,13 +4,15 @@ export enum OrderStatus {
   PENDING = "pending",
   DELIVERED = "delivered",
   CANCELED = "canceled",
+  PAID= "paid",
+  CREDIT= "credit"
 }
 
 export interface OrderProps {
   order_id?: string;
   table_id?: string;
   customer_id?: string;
-  credit_destination?: string;
+  credit_origin?: string;
   created_by?: string;
   payment_method?: string;
   products: Array<{ productId: string; quantity: number, price: number }>;
@@ -22,7 +24,7 @@ export default class Order {
   private _customerId?: string;
   private _tableId?: string;
   private _payment_method?: string;
-  private _credit_destination?: string;
+  private _credit_origin?: string;
   private _createdBy?: string;
   private _products: Array<{ productId: string; quantity: number, price: number }>;
   private _status?: OrderStatus;
@@ -33,7 +35,7 @@ export default class Order {
     this._orderId = props.order_id ?? uuid();
     this._createdBy = props.created_by;
     this._customerId = props.customer_id;
-    this._credit_destination = props.credit_destination;
+    this._credit_origin = props.credit_origin;
     this._tableId = props.table_id;
     this._products = props.products;
     this._payment_method = props.payment_method;
@@ -94,7 +96,7 @@ export default class Order {
     return this._createdBy;
   }
   
-  get creditDestination() {
-    return this._credit_destination;
+  get creditOrigin() {
+    return this._credit_origin;
   }
 }

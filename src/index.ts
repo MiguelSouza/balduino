@@ -61,6 +61,7 @@ import ProductRepository from "./infra/repositories/ProductRepository";
 import TableRepository from "./infra/repositories/TableRepository";
 import UserRepository from "./infra/repositories/UserRepository";
 import GetCreditByCustomerUseCase from "./application/usecases/order/GetCreditByCustomerUseCase";
+import TransferProductUseCase from "./application/usecases/order/TransferProductUseCase";
 
 async function main() {
   const httpServer = new HttpServer();
@@ -146,7 +147,7 @@ async function main() {
   const partialPaymentUseCase = new PartialPaymentUseCase(orderRepository);
   const creditPaymentUseCase = new CreditPaymentUseCase(orderRepository);
   const getCreditByCustomerUseCase = new GetCreditByCustomerUseCase(orderRepository);
-
+  const transferProductUseCase = new TransferProductUseCase(orderRepository);
   new OrderController(
     httpServer,
     createOrderUseCase,
@@ -160,7 +161,8 @@ async function main() {
     getOrdersToCloseOfTheDayUseCase,
     partialPaymentUseCase,
     creditPaymentUseCase,
-    getCreditByCustomerUseCase
+    getCreditByCustomerUseCase,
+    transferProductUseCase
   );
 
   const expenseRepository = new ExpenseRepository(databaseConnection);
