@@ -1,15 +1,21 @@
-import { ParameterizedQuery } from "pg-promise";
 import IOrderRepository from "../../application/repositories/OrderRepository";
 import DatabaseConnection from "../database/DatabaseConnection";
-import Order from "../domain/Order";
+import Order, { OrderStatus } from "../domain/Order";
 import { v4 as uuid } from "uuid";
 import PartialPayment from "../domain/PartialPayment";
+import CreditPayment from "../domain/CreditPayment";
+import CreditPaymentUsage from "../domain/CreditPaymentUsage";
+import TransferProduct from "../domain/TransferProduct";
+import TransferProductHistory from "../domain/TransferProductHistory";
 
 export default class OrderRepository implements IOrderRepository {
   connection?: DatabaseConnection;
 
-  constructor(connection: DatabaseConnection) {
+  constructor(connection: DatabaseConnection,
+
+  ) {
     this.connection = connection;
+
   }
 
   getByCustomer(customerId: string): Promise<Order> {
@@ -21,8 +27,8 @@ export default class OrderRepository implements IOrderRepository {
 
   async save(order: Order): Promise<Order> {
     const result = await this.connection?.query(
-      `INSERT INTO balduino.order (order_id, customer_id, table_id, status, created_at, updated_at,created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      `INSERT INTO balduino.order (order_id, customer_id, table_id, status, created_at, updated_at,created_by, credit_origin)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
         order.orderId,
         order.customerId,
@@ -30,12 +36,14 @@ export default class OrderRepository implements IOrderRepository {
         order.status || null,
         order.createdAt.toISOString(),
         order.updatedAt?.toISOString(),
-        order.createdBy
+        order.createdBy,
+        order.creditOrigin
       ],
     );
 
     await this.saveOrderProducts(order.orderId, order.products);
-    return result;
+
+    return result[0];
   }
 
   private async saveOrderProducts(
@@ -112,13 +120,95 @@ export default class OrderRepository implements IOrderRepository {
       }
     }
   }
+  
+  async payCreditOrder(creditPaymentUsage: CreditPaymentUsage): Promise<void> {
+    const orders = await this.getAllOrdersByCustomer(creditPaymentUsage.customerId || '');
+    
+    const deliveredOrders = orders.orders[0].orders
+      .filter((order: any) => order.status === 'delivered')
+      .sort((a:any, b:any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    
+    const result = await this.connection?.query(`
+      SELECT
+        COALESCE(cp_total, 0) - COALESCE(cu_total, 0) AS total
+      FROM (
+        SELECT SUM(value) AS cp_total
+        FROM balduino.credit_payment
+        WHERE customer_destination_id = $1
+      ) cp,
+      (
+        SELECT SUM(value) AS cu_total
+        FROM balduino.customer_credit_usage
+        WHERE customer_id = $1
+      ) cu
+    `, [creditPaymentUsage.customerId]);
+  
+    let availableCredit = result?.[0]?.total || 0;
+    if (availableCredit <= 0) {
+      console.log('Nenhum crédito disponível.');
+      return;
+    }
+  
+    const usageId = creditPaymentUsage.creditPaymentUsageId;
+
+    // ⚠️ Primeiro, insere o registro PAI (mesmo que com valor 0)
+    await this.connection?.query(`
+      INSERT INTO balduino.customer_credit_usage (
+        usage_id, customer_id, value, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5)
+    `, [
+      usageId,
+      creditPaymentUsage.customerId,
+      0, // será atualizado depois com o valor real
+      creditPaymentUsage.createdAt.toISOString(),
+      creditPaymentUsage.updatedAt?.toISOString(),
+    ]);
+
+    let appliedCredit = 0;
+
+    for (const order of deliveredOrders) {
+      const total = order.totalValue;
+      if (availableCredit <= 0) break;
+
+      const valueToApply = Math.min(total, availableCredit);
+
+      await this.connection?.query(`
+        INSERT INTO balduino.customer_credit_usage_orders (
+          usage_order_id, usage_id, order_id, value
+        ) VALUES (gen_random_uuid(), $1, $2, $3)
+      `, [
+        usageId,
+        order.order_id,
+        valueToApply
+      ]);
+
+      appliedCredit += valueToApply;
+      availableCredit -= valueToApply;
+    }
+
+    // ⚠️ Atualiza o valor real usado
+    if (appliedCredit > 0) {
+      await this.connection?.query(`
+        UPDATE balduino.customer_credit_usage
+        SET value = $1, updated_at = $2
+        WHERE usage_id = $3
+      `, [
+        appliedCredit,
+        creditPaymentUsage.updatedAt?.toISOString(),
+        usageId
+      ]);
+    }
+
+  
+    console.log('Créditos aplicados com sucesso.');
+  }
 
   async getById(orderId: string): Promise<Order> {
     const result = await this.connection?.query(
       "SELECT * FROM balduino.order WHERE order_id = $1",
       [orderId],
     );
-
+    
     const products = await this.getOrderProducts(orderId);
 
     return {
@@ -129,7 +219,7 @@ export default class OrderRepository implements IOrderRepository {
 
   private async getOrderProducts(
     orderId: string,
-  ): Promise<Array<{ productId: string; quantity: number }>> {
+  ): Promise<Array<{ productId: string; quantity: number, price: number }>> {
     return this.connection?.query(
       "SELECT product_id, quantity, price FROM balduino.order_product WHERE order_id = $1",
       [orderId],
@@ -149,6 +239,7 @@ export default class OrderRepository implements IOrderRepository {
       p.product_id, 
       p.name AS product_name, 
       op.quantity,
+      t.table_id as table_id,
       t.name as table_name,
       u.name as delivered_by
     FROM balduino.order o 
@@ -157,7 +248,7 @@ export default class OrderRepository implements IOrderRepository {
     JOIN balduino.table t ON t.table_id = o.table_id
     JOIN balduino.product p ON p.product_id = op.product_id
     JOIN balduino.user u ON u.user_id = o.created_by
-    WHERE c.active = true
+    WHERE c.active = true and p.type = 'common'
   `;
 
   if (status) {
@@ -211,7 +302,6 @@ export default class OrderRepository implements IOrderRepository {
       endDate.setHours(10, 0, 0, 0);
     }
 
-    // Formatação das datas no formato YYYY-MM-DD HH:mm:ss
     const formatDate = (date: Date) => {
       const year = date.getFullYear();
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -262,6 +352,7 @@ export default class OrderRepository implements IOrderRepository {
         customerName: row.customer_name,
         status: row.status,
         tableName: row.table_name,
+        tableId: row.table_id,
         products: [
           {
             productId: row.product_id,
@@ -302,33 +393,92 @@ export default class OrderRepository implements IOrderRepository {
         o.order_id, 
         o.order_number,
         o.created_at,
+        o.created_by,
         c.name AS customer_name,
         c.customer_id AS customer_id, 
         t.table_id AS table_id, 
         o.status, 
+        o.credit_origin, 
         p.product_id, 
         p.name AS product_name, 
         p.value AS product_value, 
+        p.type, 
         op.quantity,
         op.price,
         t.name AS table_name,
-        -- Soma dos pagamentos parciais
-        COALESCE((SELECT SUM(pp.value) FROM balduino.partial_payment pp WHERE pp.order_id = o.order_id), 0) AS total_partial_payment  
+    
+        -- Pagamentos parciais
+        COALESCE(pp.total_partial_payment, 0) AS total_partial_payment,
+        pp.payments,
+    
+        -- Transferências recebidas
+        COALESCE(tp.transfer_products, '[]') AS transfer_products
+    
       FROM balduino.order o 
       JOIN balduino.order_product op ON o.order_id = op.order_id
       JOIN balduino.customer c ON c.customer_id = o.customer_id
       JOIN balduino.table t ON t.table_id = o.table_id
       JOIN balduino.product p ON p.product_id = op.product_id
-      WHERE c.customer_id = $1 AND o.status = $2
+    
+      -- Pagamentos parciais agregados
+      LEFT JOIN (
+        SELECT 
+            order_id,
+            SUM(value) AS total_partial_payment,
+            json_agg(
+                json_build_object(
+                    'payment_date', payment_date,
+                    'payment_method', payment_method,
+                    'value', value
+                )
+            ) AS payments
+        FROM balduino.partial_payment
+        GROUP BY order_id
+      ) pp ON pp.order_id = o.order_id
+    
+      -- Transferências recebidas agregadas por produto/pedido
+      LEFT JOIN LATERAL (
+        SELECT json_agg(
+          json_build_object(
+            'order_transfer_history_id', oth.order_transfer_history_id,
+            'from_customer_id', cf.customer_id,
+            'from_customer_name', cf.name,
+            'quantity_transferred', oth.quantity_transferred,
+            'product_name', p.name,
+            'created_at', oth.created_at,
+            'created_at', oth.created_at,
+            'price', op_from.price
+          )
+        ) AS transfer_products
+        FROM balduino.order_transfer_history oth
+        JOIN balduino.customer cf ON cf.customer_id = oth.from_customer_id
+        JOIN balduino.order_product op_from ON op_from.order_id = oth.from_order_id AND op_from.product_id = oth.product_id
+        WHERE oth.to_order_id = o.order_id AND oth.product_id = p.product_id
+      ) tp ON true
+    
+      WHERE c.customer_id = $1 
+        AND o.status = $2 
+        AND op.quantity > 0
+    
       ORDER BY o.order_number, p.product_id;
     `, [customerId, 'delivered']);
 
     const customersOrdersList: { customerId: string, tableId: string, customerName: string, orders: any[], totalAmount: number }[] = [];
-    
+    let payments:any = [];
+    let transferProducts: any = [];
     result?.forEach((row: any) => {
       const customerName = row.customer_name;
       const customerId = row.customer_id;
-    
+      
+      if(row.transfer_products && row.order_id){
+        transferProducts.push(...row.transfer_products);
+      }
+
+      if(row.payments && row.order_id){
+        payments.push(...row.payments);
+      }
+
+      
       let customer = customersOrdersList.find(item => item.customerName === customerName);
     
       if (!customer) {
@@ -352,13 +502,17 @@ export default class OrderRepository implements IOrderRepository {
           order_id: row.order_id,
           orderNumber: row.order_number,
           createdAt: row.created_at,
+          createdBy: row.created_by,
           status: row.status,
           tableName: row.table_name,
+          tableId: row.table_id,
           products: [{
             productId: row.product_id,
             name: row.product_name,
             quantity: row.quantity,
-            value: row.price
+            value: row.price,
+            type: row.type,
+            creditOrigin: row.credit_origin
           }],
           totalValue: totalProductValue - totalPartialPayment,
           partialPaymentApplied: totalPartialPayment > 0 ? totalPartialPayment : 0,
@@ -370,7 +524,9 @@ export default class OrderRepository implements IOrderRepository {
           productId: row.product_id,
           name: row.product_name,
           quantity: row.quantity,
-          value: row.price
+          value: row.price,
+          type: row.type,
+          creditOrigin: row.credit_origin
         });
     
         if (customer.orders[orderIndex].partialPaymentApplied === 0 && totalPartialPayment > 0) {
@@ -384,18 +540,89 @@ export default class OrderRepository implements IOrderRepository {
       }
     });
     
-    return customersOrdersList;
+    return {
+      orders: customersOrdersList,
+      partialPayments: payments,
+      transferProducts
+    }
   }
 
+  async closeAccount(customerId: string, paymentMethod: string, discount: number) {
+    const client = this.connection;
+    if (!discount || discount <= 0) {
+      await client?.query(
+        `
+        UPDATE balduino.order
+        SET status = $1,
+            updated_at = $2,
+            payment_method = $3
+        WHERE customer_id = $4 AND status = $5
+        `,
+        ['paid', new Date(), paymentMethod, customerId, 'delivered']
+      );
+      return;
+    }
+  
+    const productsResult = await client?.query(
+      `
+      SELECT op.order_product_id, op.price, op.quantity
+      FROM balduino.order_product op
+      JOIN balduino.order o ON o.order_id = op.order_id
+      WHERE o.customer_id = $1 AND o.status = 'delivered'
+      ORDER BY op.order_product_id -- garante ordem fixa
+      `,
+      [customerId]
+    );
 
-  async closeAccount(customerId: string, paymentMethod: string){
-    await this.connection?.query(
-      `UPDATE balduino.order 
-       SET status = $1, updated_at = $2, payment_method = $3
-       WHERE customer_id = $4 and status = $5`,
-      ['paid', new Date(), paymentMethod, customerId, 'delivered'],
+    const products = productsResult || [];
+  
+    let remainingDiscount = discount;
+  
+    for (const product of products) {
+      const totalProductValue = product.price * product.quantity;
+  
+      if (remainingDiscount <= 0) break;
+  
+      if (remainingDiscount < totalProductValue) {
+        const newTotal = totalProductValue - remainingDiscount;
+        const newPrice = newTotal / product.quantity;
+        await client?.query(
+          `
+          UPDATE balduino.order_product
+          SET price = $1
+          WHERE order_product_id = $2
+          `,
+          [newPrice, product.order_product_id]
+        );
+  
+        remainingDiscount = 0;
+        break;
+      }
+  
+      await client?.query(
+        `
+        UPDATE balduino.order_product
+        SET price = 0
+        WHERE order_product_id = $1
+        `,
+        [product.order_product_id]
+      );
+  
+      remainingDiscount -= totalProductValue;
+    }
+  
+    await client?.query(
+      `
+      UPDATE balduino.order
+      SET status = $1,
+          updated_at = $2,
+          payment_method = $3
+      WHERE customer_id = $4 AND status = $5
+      `,
+      ['paid', new Date(), paymentMethod, customerId, 'delivered']
     );
   }
+  
 
   async closeAccountWithoutCustomer(order: Order){
     const result = await this.connection?.query(
@@ -435,66 +662,94 @@ export default class OrderRepository implements IOrderRepository {
     } else {
         throw new Error('Invalid period filter');
     }
-
+   
     const result = await this.connection?.query(
       `
-     SELECT
-    payment_method,
-    SUM(total_faturado) AS total_faturado
+ SELECT
+  final.payment_method,
+  SUM(final.total_faturado) AS total_faturado
 FROM (
-    -- Subconsulta para calcular o total de cada order com ajuste de partial payments
-    SELECT 
-        o.payment_method,                          
-        -- Calculando o total ajustado com base no valor de partial_payment
-        CASE 
-            WHEN pp.value IS NOT NULL THEN 
-                (SUM(op.quantity * op.price) - pp.value)  -- Subtrai o partial_payment do total da order
-            ELSE 
-                SUM(op.quantity * op.price)  -- Se não houver partial_payment, usa o total da order normalmente
-        END AS total_faturado
-    FROM 
-        balduino."order" o
-    JOIN 
-        balduino.order_product op ON o.order_id = op.order_id
-    LEFT JOIN 
-        balduino.partial_payment pp ON o.order_id = pp.order_id  -- Juntando com partial_payment para ajustar o valor
-    WHERE 
-        o.status = 'paid'
-        ${filters.period === 'monthly' ? 
-            `AND (
-                o.updated_at >= date_trunc('month', $1::date) + INTERVAL '10 hours'
-                AND o.updated_at < date_trunc('month', $1::date + INTERVAL '1 month')
-            )` : 
-            `AND (
-                -- Para o período diário, verifica a hora e a data
-                (EXTRACT(HOUR FROM o.updated_at) >= 10 AND o.updated_at::date = $1::date)
-                OR
-                (EXTRACT(HOUR FROM o.updated_at) < 9 AND o.updated_at::date = ($1::date + INTERVAL '1 day')::date)
-            )`}
-    GROUP BY 
-        o.payment_method, o.order_id, pp.value  -- Agrupando por order_id para garantir que o ajuste seja feito corretamente
+  -- 1. Créditos adquiridos com forma de pagamento real (entrada de crédito)
+  SELECT 
+    cp.payment_method,
+    cp.value AS total_faturado
+  FROM 
+    balduino.credit_payment cp
+  WHERE 
+    ${filters.period === 'monthly' ? 
+      `cp.created_at >= date_trunc('month', $1::date) + INTERVAL '10 hours'
+       AND cp.created_at < date_trunc('month', $1::date + INTERVAL '1 month')` :
+      `(
+          (EXTRACT(HOUR FROM cp.created_at) >= 10 AND cp.created_at::date = $1::date)
+          OR
+          (EXTRACT(HOUR FROM cp.created_at) < 9 AND cp.created_at::date = ($1::date + INTERVAL '1 day')::date)
+      )`
+    }
 
-    UNION ALL
+  UNION ALL
 
-    -- Consulta para a tabela "partial_payment"
+  SELECT
+  o.payment_method,
+  SUM(order_totals.total_price - COALESCE(cuo.used_credit, 0)) AS total_faturado
+FROM
+  balduino."order" o
+JOIN (
     SELECT
-        pp.payment_method,
-        SUM(pp.value) AS total_faturado
+      order_id,
+      SUM(quantity * price) AS total_price
     FROM
-        balduino.partial_payment pp
-    JOIN
-        balduino."order" o ON o.order_id = pp.order_id
-    WHERE
-        pp.payment_date >= $1::date + INTERVAL '7 hours'  -- Início às 7 da manhã do dia fornecido
-        AND pp.payment_date < $1::date + INTERVAL '1 day' + INTERVAL '6 hours'  -- Fim às 6 da manhã do dia seguinte
+      balduino.order_product
+    WHERE quantity > 0
     GROUP BY
-        pp.payment_method
+      order_id
+) order_totals ON order_totals.order_id = o.order_id
+LEFT JOIN (
+    SELECT
+      order_id AS order_id,
+      SUM(value) AS used_credit
+    FROM
+      balduino.customer_credit_usage_orders
+    GROUP BY
+      usage_order_id
+) cuo ON cuo.order_id = o.order_id
+WHERE
+  o.status = 'paid' 
+  AND (
+    cuo.used_credit IS NULL OR
+    cuo.used_credit < order_totals.total_price
+  )
+  ${filters.period === 'monthly' ? 
+    `AND o.updated_at >= date_trunc('month', $1::date) + INTERVAL '10 hours'
+     AND o.updated_at < date_trunc('month', $1::date + INTERVAL '1 month')` :
+    `AND (
+        (EXTRACT(HOUR FROM o.updated_at) >= 10 AND o.updated_at::date = $1::date)
+        OR
+        (EXTRACT(HOUR FROM o.updated_at) < 9 AND o.updated_at::date = ($1::date + INTERVAL '1 day')::date)
+    )`}
+GROUP BY
+  o.payment_method
 
-) AS combined_results
-GROUP BY 
-    payment_method
-ORDER BY 
-    total_faturado DESC;
+  UNION ALL
+
+  -- 3. Pagamentos parciais diretos
+  SELECT
+    pp.payment_method,
+    SUM(pp.value) AS total_faturado
+  FROM
+    balduino.partial_payment pp
+  JOIN
+    balduino."order" o ON o.order_id = pp.order_id
+  WHERE
+    pp.payment_date >= $1::date + INTERVAL '7 hours'
+    AND pp.payment_date < $1::date + INTERVAL '1 day' + INTERVAL '6 hours'
+  GROUP BY
+    pp.payment_method
+
+) AS final
+GROUP BY
+  final.payment_method
+ORDER BY
+  total_faturado DESC;
 
 
       `,
@@ -546,24 +801,6 @@ ORDER BY
     };
   }
 
-  /*async transferBill(transferBill: any): Promise<any> {
-    const result = await this.connection?.query(
-      `INSERT INTO balduino.customer_balance_transfer
-        (transfer_id, from_customer_id, to_customer_id, status, value, transfer_date) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [
-        transferBill.transferBillId,
-        transferBill.fromCustomerId,
-        transferBill.toCustomerId,
-        transferBill.status,
-        transferBill.value,
-        transferBill.transferDate.toString(),
-      ]
-    );
-    
-    return result;
-  }*/
-
   async payPartial(partialPayment: PartialPayment): Promise<PartialPayment> {
     const result = await this.connection?.query(
       `INSERT INTO balduino.partial_payment 
@@ -583,6 +820,330 @@ ORDER BY
     return result;
   }
 
+  async getCustomerById(customerId: string): Promise<any> {
+    
+      const result = await this.connection?.query(
+        `
+         SELECT c.customer_id, c.name, c.phone, c.active, c.created_at, c.updated_at,
+          array_agg(
+              json_build_object('table_id', t.table_id, 'table_name', t.name, 'day', ct.day_of_week)
+            ) AS customerTables
+          FROM balduino.customer c
+          LEFT JOIN balduino.customer_table ct ON c.customer_id = ct.customer_id
+          LEFT JOIN balduino.table t ON t.table_id = ct.table_id
+          WHERE c.customer_id = $1
+          GROUP BY c.customer_id, c.name, c.phone, c.active, c.created_at, c.updated_at
+        `,
+        [customerId],
+      );
+      
+      return result;
+    
+  }
 
+  async getProductByType(type: string): Promise<any> {
+    
+    const result = await this.connection?.query(
+      `
+       SELECT p.product_id
+       FROM balduino.product p
+       WHERE p.type = $1
+      `,
+      [type],
+    );
+    
+    return result;
+  
+  }
+
+  async payCredit(creditPayment: CreditPayment): Promise<CreditPayment> {
+    const result = await this.connection?.query(
+      `INSERT INTO balduino.credit_payment 
+        (credit_payment_id, payment_method, customer_origin_id, customer_destination_id, value, created_at, updated_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        creditPayment.creditPaymentId,
+        creditPayment.paymentMethod,
+        creditPayment.customerOriginId,
+        creditPayment.customerDestinationId,
+        creditPayment.value,
+        creditPayment.createdAt.toISOString(),
+        creditPayment.updatedAt?.toISOString()
+      ]
+    );
+    
+    return result?.[0];
+  }
+
+  async getCreditByCustomer(customerId: string): Promise<number> {
+    const result = await this.connection?.query(
+      `
+      SELECT
+        COALESCE(cp_total.total, 0) - COALESCE(cu_total.total, 0) AS total
+      FROM
+        (
+          SELECT SUM(value) AS total
+          FROM balduino.credit_payment
+          WHERE customer_destination_id = $1
+        ) cp_total,
+        (
+          SELECT SUM(value) AS total
+          FROM balduino.customer_credit_usage
+          WHERE customer_id = $1
+        ) cu_total
+      `,
+      [customerId]
+    );
+  
+    return result?.[0]?.total ?? 0;
+  }
+  
+  async transferProduct(orderProduct: TransferProduct): Promise<any> {
+    const orders = await this.getOrderProducts(orderProduct.orderId);
+    const product = orders.filter((order: any) => order.product_id === orderProduct.productId)
+
+    if(product.length){
+      const resultOrderProduct = await this.connection?.query(
+        `UPDATE balduino.order_product 
+         SET quantity = $1 
+         WHERE order_id = $2 AND product_id = $3`,
+        [
+          product[0].quantity - orderProduct.quantity,
+          orderProduct.orderId,
+          orderProduct.productId,
+        ]
+      );
+    }
+    
+    const orderEntity = new Order({
+      customer_id: orderProduct.toCustomerId,
+      created_by: orderProduct.createdBy,
+      products: [{
+        productId: orderProduct.productId,
+        quantity: orderProduct.quantity,
+        price: product[0].price
+      }],
+      status: orderProduct.status ?? OrderStatus.PENDING,
+      table_id: orderProduct.tableId
+    });
+
+    const result = await this.save(orderEntity) as any;
+    const transferProductHistoryEntity = new TransferProductHistory({ 
+      fromOrderId: orderProduct.orderId,
+      toOrderId: result.order_id,
+      productId: orderProduct.productId,
+      quantityTransferred: orderProduct.quantity,
+      fromCustomerId: orderProduct.fromCustomerId,
+      toCustomerId: orderProduct.toCustomerId,
+    });
+
+    await this.saveOrderTransferHistory(transferProductHistoryEntity);
+    return null
+  }
+
+  async saveOrderTransferHistory(transferProductHistory: TransferProductHistory) {
+    const result = await this.connection?.query(
+      `INSERT INTO balduino.order_transfer_history
+        (order_transfer_history_id, from_order_id, to_order_id, product_id, quantity_transferred, from_customer_id, to_customer_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [
+        transferProductHistory.orderTransferHistoryId,
+        transferProductHistory.fromOrderId,
+        transferProductHistory.toOrderId,
+        transferProductHistory.productId,
+        transferProductHistory.quantityTransferred,
+        transferProductHistory.fromCustomerId,
+        transferProductHistory.toCustomerId,
+        transferProductHistory.createdAt.toISOString(),
+        transferProductHistory.updatedAt?.toISOString()
+      ]
+    );
+  }
+  
+  
+  async getTransferProductsByCustomerId(customerId: string, orderId: string): Promise<any[]> {
+    const result = await this.connection?.query(
+      ` 
+        SELECT
+          oth.order_transfer_history_id,
+          oth.quantity_transferred as quantity,
+          oth.created_at,
+          op.price AS product_value,
+          p.product_id,
+          p.name AS product_name,
+          cf.customer_id AS from_customer_id,
+          cf.name AS from_customer_name,
+          ct.customer_id AS to_customer_id,
+          ct.name AS to_customer_name
+        FROM balduino.order_transfer_history oth
+        JOIN balduino.product p ON p.product_id = oth.product_id
+        JOIN balduino.customer cf ON cf.customer_id = oth.from_customer_id
+        JOIN balduino.customer ct ON ct.customer_id = oth.to_customer_id
+        JOIN balduino.order o ON ot.order_id = oth.to_order_id
+        JOIN balduino.order_product op ON op.order_id = oth.from_order_id AND op.product_id = oth.product_id
+        WHERE ct.customer_id = $1 AND o.order_id = $2
+      `,
+      [customerId, orderId]
+    );
+  
+    return result;
+  }
+
+  async getHistoricOrderByCustomer(customerId: string): Promise<any> {
+    const result = await this.connection?.query(`
+      SELECT 
+        o.order_id, 
+        o.order_number,
+        o.created_at,
+        c.name AS customer_name,
+        c.customer_id AS customer_id, 
+        t.table_id AS table_id, 
+        o.status, 
+        o.credit_origin, 
+        p.product_id, 
+        p.name AS product_name, 
+        p.value AS product_value, 
+        p.type, 
+        op.quantity,
+        op.price,
+        t.name AS table_name,
+  
+        -- Pagamentos parciais
+        COALESCE(pp.total_partial_payment, 0) AS total_partial_payment,
+        pp.payments,
+  
+        -- Transferências recebidas
+        COALESCE(tp.transfer_products, '[]') AS transfer_products
+  
+      FROM balduino.order o 
+      JOIN balduino.order_product op ON o.order_id = op.order_id
+      JOIN balduino.customer c ON c.customer_id = o.customer_id
+      JOIN balduino.table t ON t.table_id = o.table_id
+      JOIN balduino.product p ON p.product_id = op.product_id
+  
+      -- Pagamentos parciais agregados
+      LEFT JOIN (
+        SELECT 
+            order_id,
+            SUM(value) AS total_partial_payment,
+            json_agg(
+                json_build_object(
+                    'payment_date', payment_date,
+                    'payment_method', payment_method,
+                    'value', value
+                )
+            ) AS payments
+        FROM balduino.partial_payment
+        GROUP BY order_id
+      ) pp ON pp.order_id = o.order_id
+  
+      -- Transferências recebidas agregadas por produto/pedido
+      LEFT JOIN LATERAL (
+        SELECT json_agg(
+          json_build_object(
+            'order_transfer_history_id', oth.order_transfer_history_id,
+            'from_customer_id', cf.customer_id,
+            'from_customer_name', cf.name,
+            'quantity_transferred', oth.quantity_transferred,
+            'product_name', p.name,
+            'created_at', oth.created_at,
+            'price', op_from.price
+          )
+        ) AS transfer_products
+        FROM balduino.order_transfer_history oth
+        JOIN balduino.customer cf ON cf.customer_id = oth.from_customer_id
+        JOIN balduino.order_product op_from ON op_from.order_id = oth.from_order_id AND op_from.product_id = oth.product_id
+        WHERE oth.to_order_id = o.order_id AND oth.product_id = p.product_id
+      ) tp ON true
+  
+      WHERE c.customer_id = $1 
+        AND o.status = 'paid'
+        AND op.quantity > 0
+  
+      ORDER BY o.order_number, p.product_id;
+    `, [customerId]);
+  
+    const customersOrdersList: { customerId: string, tableId: string, customerName: string, orders: any[], totalAmount: number }[] = [];
+    let payments: any = [];
+    let transferProducts: any = [];
+  
+    result?.forEach((row: any) => {
+      const customerName = row.customer_name;
+      const customerId = row.customer_id;
+  
+      if (row.transfer_products && row.order_id) {
+        transferProducts.push(...row.transfer_products);
+      }
+  
+      if (row.payments && row.order_id) {
+        payments.push(...row.payments);
+      }
+  
+      let customer = customersOrdersList.find(item => item.customerName === customerName);
+  
+      if (!customer) {
+        customer = {
+          customerName: customerName,
+          customerId: customerId,
+          tableId: row.table_id,
+          orders: [],
+          totalAmount: 0,
+        };
+        customersOrdersList.push(customer);
+      }
+  
+      const orderIndex = customer.orders.findIndex((order: any) => order.order_id === row.order_id);
+  
+      const totalProductValue = row.price * row.quantity;
+      const totalPartialPayment = parseFloat(row.total_partial_payment);
+  
+      if (orderIndex === -1) {
+        customer.orders.push({
+          order_id: row.order_id,
+          orderNumber: row.order_number,
+          createdAt: row.created_at,
+          status: row.status,
+          tableName: row.table_name,
+          tableId: row.table_id,
+          products: [{
+            productId: row.product_id,
+            name: row.product_name,
+            quantity: row.quantity,
+            value: row.price,
+            type: row.type,
+            creditOrigin: row.credit_origin
+          }],
+          totalValue: totalProductValue - totalPartialPayment,
+          partialPaymentApplied: totalPartialPayment > 0 ? totalPartialPayment : 0,
+        });
+  
+        customer.totalAmount += (totalProductValue - totalPartialPayment);
+      } else {
+        customer.orders[orderIndex].products.push({
+          productId: row.product_id,
+          name: row.product_name,
+          quantity: row.quantity,
+          value: row.price,
+          type: row.type,
+          creditOrigin: row.credit_origin
+        });
+  
+        if (customer.orders[orderIndex].partialPaymentApplied === 0 && totalPartialPayment > 0) {
+          customer.orders[orderIndex].totalValue += totalProductValue - totalPartialPayment;
+          customer.totalAmount += (totalProductValue - totalPartialPayment);
+          customer.orders[orderIndex].partialPaymentApplied = totalPartialPayment;
+        } else {
+          customer.orders[orderIndex].totalValue += totalProductValue;
+          customer.totalAmount += totalProductValue;
+        }
+      }
+    });
+  
+    return {
+      orders: customersOrdersList,
+      partialPayments: payments,
+      transferProducts
+    };
+  }
   
 }

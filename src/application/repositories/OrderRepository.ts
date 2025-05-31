@@ -7,5 +7,5 @@ export default interface IOrderRepository {
   getAll(filters: any): Promise<Order[]>;
   delete(orderId: string): void;
   getByCustomer(customerId: string): Promise<Order>;
-  closeAccount(customerId: string, paymentMethod: string): void;
+  closeAccount(customerId: string, paymentMethod: string, discount: number): void;
 }

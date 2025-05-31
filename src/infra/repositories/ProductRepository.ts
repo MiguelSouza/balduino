@@ -60,26 +60,28 @@ export default class ProductRepository implements IProductRepository {
 
   async getAll(query: any): Promise<Product[]> {
     return this.connection?.query(`
-       SELECT 
-    p.product_id,
-    p.name,
-    p.value,
-    p.image,
-    p.active,
-    p.created_at,
-    p.updated_at,
-    p.editable,
-    COALESCE(SUM(CASE WHEN o.status = 'paid' THEN op.quantity ELSE 0 END), 0) AS total_vendido
-FROM 
-    balduino.product p
-LEFT JOIN 
-    balduino.order_product op ON p.product_id = op.product_id
-LEFT JOIN 
-    balduino."order" o ON o.order_id = op.order_id
-GROUP BY 
-    p.product_id, p.name, p.value, p.image, p.active, p.created_at, p.updated_at, p.editable
-ORDER BY 
-    total_vendido DESC;
+        SELECT 
+            p.product_id,
+            p.name,
+            p.value,
+            p.image,
+            p.active,
+            p.type,
+            p.created_at,
+            p.updated_at,
+            p.editable,
+            COALESCE(SUM(CASE WHEN o.status = 'paid' THEN op.quantity ELSE 0 END), 0) AS total_vendido
+        FROM 
+            balduino.product p
+        LEFT JOIN 
+            balduino.order_product op ON p.product_id = op.product_id
+        LEFT JOIN 
+            balduino.order o ON o.order_id = op.order_id
+        WHERE p.type = 'common'
+        GROUP BY 
+            p.product_id, p.name, p.value, p.image, p.active, p.created_at, p.updated_at, p.editable
+        ORDER BY 
+            total_vendido DESC;
       `, null);
   }
 

@@ -32,7 +32,7 @@ export default class ExpressAdapter implements HttpServer {
       url,
       ...middlewares,
       async function (req: Request, res: Response) {
-        const output = await callback(req.params, req.body, req.query, req.file);
+        const output = await callback(req.params, req.body, req.query, req.file, res);
         res.json(output);
       },
     );
