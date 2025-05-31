@@ -18,7 +18,10 @@ export default class ExpressAdapter implements HttpServer {
   constructor() {
     this.app = express();
     this.app.use(express.json());
-    this.app.use(cors());
+    this.app.use(cors({
+      origin: ['https://d3ak7yebchpp7t.cloudfront.net'],
+      credentials: true,
+    }));
     this.app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
   }
 
