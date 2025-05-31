@@ -5,7 +5,6 @@ import { v4 as uuid } from "uuid";
 import PartialPayment from "../domain/PartialPayment";
 import CreditPayment from "../domain/CreditPayment";
 import CreditPaymentUsage from "../domain/CreditPaymentUsage";
-import CustomerRepository from "./CustomerRepository";
 import TransferProduct from "../domain/TransferProduct";
 import TransferProductHistory from "../domain/TransferProductHistory";
 
@@ -548,20 +547,82 @@ export default class OrderRepository implements IOrderRepository {
     }
   }
 
-  async closeAccount(customerId: string, paymentMethod: string){
-    const creditPaymentUsage = new CreditPaymentUsage({
-      customer_id: customerId,
-      value: 0,
-    })
-    await this.payCreditOrder(creditPaymentUsage)
+  async closeAccount(customerId: string, paymentMethod: string, discount: number) {
+    const client = this.connection;
+    if (!discount || discount <= 0) {
+      await client?.query(
+        `
+        UPDATE balduino.order
+        SET status = $1,
+            updated_at = $2,
+            payment_method = $3
+        WHERE customer_id = $4 AND status = $5
+        `,
+        ['paid', new Date(), paymentMethod, customerId, 'delivered']
+      );
+      return;
+    }
+  
+    const productsResult = await client?.query(
+      `
+      SELECT op.order_product_id, op.price, op.quantity
+      FROM balduino.order_product op
+      JOIN balduino.order o ON o.order_id = op.order_id
+      WHERE o.customer_id = $1 AND o.status = 'delivered'
+      ORDER BY op.order_product_id -- garante ordem fixa
+      `,
+      [customerId]
+    );
 
-    await this.connection?.query(
-      `UPDATE balduino.order 
-       SET status = $1, updated_at = $2, payment_method = $3
-       WHERE customer_id = $4 and status = $5`,
-      ['paid', new Date(), paymentMethod, customerId, 'delivered'],
+    const products = productsResult || [];
+  
+    let remainingDiscount = discount;
+  
+    for (const product of products) {
+      const totalProductValue = product.price * product.quantity;
+  
+      if (remainingDiscount <= 0) break;
+  
+      if (remainingDiscount < totalProductValue) {
+        const newTotal = totalProductValue - remainingDiscount;
+        const newPrice = newTotal / product.quantity;
+        await client?.query(
+          `
+          UPDATE balduino.order_product
+          SET price = $1
+          WHERE order_product_id = $2
+          `,
+          [newPrice, product.order_product_id]
+        );
+  
+        remainingDiscount = 0;
+        break;
+      }
+  
+      await client?.query(
+        `
+        UPDATE balduino.order_product
+        SET price = 0
+        WHERE order_product_id = $1
+        `,
+        [product.order_product_id]
+      );
+  
+      remainingDiscount -= totalProductValue;
+    }
+  
+    await client?.query(
+      `
+      UPDATE balduino.order
+      SET status = $1,
+          updated_at = $2,
+          payment_method = $3
+      WHERE customer_id = $4 AND status = $5
+      `,
+      ['paid', new Date(), paymentMethod, customerId, 'delivered']
     );
   }
+  
 
   async closeAccountWithoutCustomer(order: Order){
     const result = await this.connection?.query(
@@ -927,4 +988,162 @@ ORDER BY
   
     return result;
   }
+
+  async getHistoricOrderByCustomer(customerId: string): Promise<any> {
+    const result = await this.connection?.query(`
+      SELECT 
+        o.order_id, 
+        o.order_number,
+        o.created_at,
+        c.name AS customer_name,
+        c.customer_id AS customer_id, 
+        t.table_id AS table_id, 
+        o.status, 
+        o.credit_origin, 
+        p.product_id, 
+        p.name AS product_name, 
+        p.value AS product_value, 
+        p.type, 
+        op.quantity,
+        op.price,
+        t.name AS table_name,
+  
+        -- Pagamentos parciais
+        COALESCE(pp.total_partial_payment, 0) AS total_partial_payment,
+        pp.payments,
+  
+        -- Transferências recebidas
+        COALESCE(tp.transfer_products, '[]') AS transfer_products
+  
+      FROM balduino.order o 
+      JOIN balduino.order_product op ON o.order_id = op.order_id
+      JOIN balduino.customer c ON c.customer_id = o.customer_id
+      JOIN balduino.table t ON t.table_id = o.table_id
+      JOIN balduino.product p ON p.product_id = op.product_id
+  
+      -- Pagamentos parciais agregados
+      LEFT JOIN (
+        SELECT 
+            order_id,
+            SUM(value) AS total_partial_payment,
+            json_agg(
+                json_build_object(
+                    'payment_date', payment_date,
+                    'payment_method', payment_method,
+                    'value', value
+                )
+            ) AS payments
+        FROM balduino.partial_payment
+        GROUP BY order_id
+      ) pp ON pp.order_id = o.order_id
+  
+      -- Transferências recebidas agregadas por produto/pedido
+      LEFT JOIN LATERAL (
+        SELECT json_agg(
+          json_build_object(
+            'order_transfer_history_id', oth.order_transfer_history_id,
+            'from_customer_id', cf.customer_id,
+            'from_customer_name', cf.name,
+            'quantity_transferred', oth.quantity_transferred,
+            'product_name', p.name,
+            'created_at', oth.created_at,
+            'price', op_from.price
+          )
+        ) AS transfer_products
+        FROM balduino.order_transfer_history oth
+        JOIN balduino.customer cf ON cf.customer_id = oth.from_customer_id
+        JOIN balduino.order_product op_from ON op_from.order_id = oth.from_order_id AND op_from.product_id = oth.product_id
+        WHERE oth.to_order_id = o.order_id AND oth.product_id = p.product_id
+      ) tp ON true
+  
+      WHERE c.customer_id = $1 
+        AND o.status = 'paid'
+        AND op.quantity > 0
+  
+      ORDER BY o.order_number, p.product_id;
+    `, [customerId]);
+  
+    const customersOrdersList: { customerId: string, tableId: string, customerName: string, orders: any[], totalAmount: number }[] = [];
+    let payments: any = [];
+    let transferProducts: any = [];
+  
+    result?.forEach((row: any) => {
+      const customerName = row.customer_name;
+      const customerId = row.customer_id;
+  
+      if (row.transfer_products && row.order_id) {
+        transferProducts.push(...row.transfer_products);
+      }
+  
+      if (row.payments && row.order_id) {
+        payments.push(...row.payments);
+      }
+  
+      let customer = customersOrdersList.find(item => item.customerName === customerName);
+  
+      if (!customer) {
+        customer = {
+          customerName: customerName,
+          customerId: customerId,
+          tableId: row.table_id,
+          orders: [],
+          totalAmount: 0,
+        };
+        customersOrdersList.push(customer);
+      }
+  
+      const orderIndex = customer.orders.findIndex((order: any) => order.order_id === row.order_id);
+  
+      const totalProductValue = row.price * row.quantity;
+      const totalPartialPayment = parseFloat(row.total_partial_payment);
+  
+      if (orderIndex === -1) {
+        customer.orders.push({
+          order_id: row.order_id,
+          orderNumber: row.order_number,
+          createdAt: row.created_at,
+          status: row.status,
+          tableName: row.table_name,
+          tableId: row.table_id,
+          products: [{
+            productId: row.product_id,
+            name: row.product_name,
+            quantity: row.quantity,
+            value: row.price,
+            type: row.type,
+            creditOrigin: row.credit_origin
+          }],
+          totalValue: totalProductValue - totalPartialPayment,
+          partialPaymentApplied: totalPartialPayment > 0 ? totalPartialPayment : 0,
+        });
+  
+        customer.totalAmount += (totalProductValue - totalPartialPayment);
+      } else {
+        customer.orders[orderIndex].products.push({
+          productId: row.product_id,
+          name: row.product_name,
+          quantity: row.quantity,
+          value: row.price,
+          type: row.type,
+          creditOrigin: row.credit_origin
+        });
+  
+        if (customer.orders[orderIndex].partialPaymentApplied === 0 && totalPartialPayment > 0) {
+          customer.orders[orderIndex].totalValue += totalProductValue - totalPartialPayment;
+          customer.totalAmount += (totalProductValue - totalPartialPayment);
+          customer.orders[orderIndex].partialPaymentApplied = totalPartialPayment;
+        } else {
+          customer.orders[orderIndex].totalValue += totalProductValue;
+          customer.totalAmount += totalProductValue;
+        }
+      }
+    });
+  
+    return {
+      orders: customersOrdersList,
+      partialPayments: payments,
+      transferProducts
+    };
+  }
+  
 }

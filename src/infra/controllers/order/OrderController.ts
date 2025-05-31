@@ -14,6 +14,7 @@ import HttpServer from "../../http/HttpServer";
 import OrderDto from "./dto/OrderDto";
 import GetCreditByCustomerUseCase from "../../../application/usecases/order/GetCreditByCustomerUseCase";
 import TransferProductUseCase from "../../../application/usecases/order/TransferProductUseCase";
+import GetHistoricOrderByCustomerUseCase from "../../../application/usecases/order/GetHistoricOrderByCustomerUseCase";
 
 export default class OrderController {
   constructor(
@@ -30,7 +31,8 @@ export default class OrderController {
     partialPaymentUseCase: PartialPaymentUseCase,
     creditPaymentUseCase: CreditPaymentUseCase,
     getCreditByCustomerUseCase: GetCreditByCustomerUseCase,
-    transferProductUseCase: TransferProductUseCase
+    transferProductUseCase: TransferProductUseCase,
+    getHistoricOrderByCustomerUseCase: GetHistoricOrderByCustomerUseCase,
   ) {
     httpServer.register(
       "post",
@@ -80,6 +82,15 @@ export default class OrderController {
 
     httpServer.register(
       "get",
+      "/orders/:customer_id/bill/historic",
+      [jwtGuard],
+      async (params: any, body: any) => {
+        return await getHistoricOrderByCustomerUseCase.execute(params.customer_id);
+      },
+    );
+
+    httpServer.register(
+      "get",
       "/order/:orderId",
       [jwtGuard],
       async (params: any, body: any) => {
@@ -92,7 +103,7 @@ export default class OrderController {
       "/order/:customerId/close",
       [jwtGuard],
       async (params: any, body: any) => {
-        return await closeAccountUseCase.execute(params.customerId, body.paymentMethod);
+        return await closeAccountUseCase.execute(params.customerId, body.paymentMethod, body.discount);
       },
     );
 

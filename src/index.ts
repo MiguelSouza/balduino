@@ -62,6 +62,10 @@ import TableRepository from "./infra/repositories/TableRepository";
 import UserRepository from "./infra/repositories/UserRepository";
 import GetCreditByCustomerUseCase from "./application/usecases/order/GetCreditByCustomerUseCase";
 import TransferProductUseCase from "./application/usecases/order/TransferProductUseCase";
+import GenerateReportUseCase from "./application/usecases/report/GenerateReportUseCase";
+import ReportRepository from "./infra/repositories/ReportRepository";
+import ReportController from "./infra/controllers/report/ReportController";
+import GetHistoricOrderByCustomerUseCase from "./application/usecases/order/GetHistoricOrderByCustomerUseCase";
 
 async function main() {
   const httpServer = new HttpServer();
@@ -148,6 +152,7 @@ async function main() {
   const creditPaymentUseCase = new CreditPaymentUseCase(orderRepository);
   const getCreditByCustomerUseCase = new GetCreditByCustomerUseCase(orderRepository);
   const transferProductUseCase = new TransferProductUseCase(orderRepository);
+  const getHistoricOrderByCustomerUseCase = new GetHistoricOrderByCustomerUseCase(orderRepository);
   new OrderController(
     httpServer,
     createOrderUseCase,
@@ -162,7 +167,8 @@ async function main() {
     partialPaymentUseCase,
     creditPaymentUseCase,
     getCreditByCustomerUseCase,
-    transferProductUseCase
+    transferProductUseCase,
+    getHistoricOrderByCustomerUseCase
   );
 
   const expenseRepository = new ExpenseRepository(databaseConnection);
@@ -199,6 +205,14 @@ async function main() {
     getMonthlyPayerByIdUseCase,
     getPaymentsByMonthlyPayerUseCase,
     paymentMonthlyUseCase
+  );
+
+  const reportRepository = new ReportRepository(databaseConnection);
+  const generateReportUseCase = new GenerateReportUseCase(reportRepository);
+
+  new ReportController(
+    httpServer,
+    generateReportUseCase
   );
 
   httpServer.listen(3000);
