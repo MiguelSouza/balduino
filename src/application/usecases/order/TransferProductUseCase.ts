@@ -17,7 +17,8 @@ export default class TransferProductUseCase {
       toCustomerId: transferProduct.toCustomerId,
       fromCustomerId: transferProduct.fromCustomerId,
       status: transferProduct.status,
-      tableId: transferProduct.tableId
+      tableId: transferProduct.tableId,
+      createdBy: transferProduct.createdBy
     });
     return await this.orderRepository?.transferProduct(transferProductEntity);
   }

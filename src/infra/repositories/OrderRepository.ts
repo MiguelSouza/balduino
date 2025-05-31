@@ -393,6 +393,7 @@ export default class OrderRepository implements IOrderRepository {
         o.order_id, 
         o.order_number,
         o.created_at,
+        o.created_by,
         c.name AS customer_name,
         c.customer_id AS customer_id, 
         t.table_id AS table_id, 
@@ -461,8 +462,6 @@ export default class OrderRepository implements IOrderRepository {
     
       ORDER BY o.order_number, p.product_id;
     `, [customerId, 'delivered']);
-    
-
 
     const customersOrdersList: { customerId: string, tableId: string, customerName: string, orders: any[], totalAmount: number }[] = [];
     let payments:any = [];
@@ -503,6 +502,7 @@ export default class OrderRepository implements IOrderRepository {
           order_id: row.order_id,
           orderNumber: row.order_number,
           createdAt: row.created_at,
+          createdBy: row.created_by,
           status: row.status,
           tableName: row.table_name,
           tableId: row.table_id,
@@ -914,10 +914,10 @@ ORDER BY
         ]
       );
     }
-
+    
     const orderEntity = new Order({
       customer_id: orderProduct.toCustomerId,
-      created_by: '68a7bf74-0908-441d-a8ed-c6e8a81c5c21',
+      created_by: orderProduct.createdBy,
       products: [{
         productId: orderProduct.productId,
         quantity: orderProduct.quantity,

@@ -4,6 +4,7 @@ import { OrderStatus } from "./Order";
 export interface TransferProductProps {
   transferProductId?: string;
   productId: string;
+  createdBy: string;
   fromCustomerId: string;
   toCustomerId: string;
   orderId: string;
@@ -16,6 +17,7 @@ export interface TransferProductProps {
 export default class TransferProduct {
   private _transfer_product_id: string;
   private _order_id: string;
+  private _created_by: string;
   private _product_id: string;
   private _transfer_date?: Date;
   private _quantity: number;
@@ -29,6 +31,7 @@ export default class TransferProduct {
   constructor(props: TransferProductProps) {
     this._transfer_product_id = props.transferProductId ?? uuid();
     this._to_customer_id = props.toCustomerId;
+    this._created_by = props.createdBy;
     this._from_customer_id = props.fromCustomerId;
     this._order_id = props.orderId;
     this._product_id = props.productId,
@@ -61,6 +64,10 @@ export default class TransferProduct {
 
   get orderId() {
     return this._order_id;
+  }
+
+  get createdBy() {
+    return this._created_by;
   }
 
   get productId() {
