@@ -30,6 +30,7 @@ export default class ReportRepository {
         c.name AS nome_cliente,
         p.name AS nome_produto,
         op.quantity AS quantidade,
+        op.price AS valor,
         t.name AS nome_mesa,
         u.name AS entregue_por
     FROM balduino.order o 
