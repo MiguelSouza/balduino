@@ -740,8 +740,12 @@ GROUP BY
   JOIN
     balduino."order" o ON o.order_id = pp.order_id
   WHERE
-    pp.payment_date >= $1::date + INTERVAL '7 hours'
-    AND pp.payment_date < $1::date + INTERVAL '1 day' + INTERVAL '6 hours'
+     ${filters.period === 'monthly' ?
+    `pp.payment_date >= date_trunc('month', $1::date) + INTERVAL '10 hours'
+     AND pp.payment_date < date_trunc('month', $1::date + INTERVAL '1 month')` :
+    `pp.payment_date >= $1::date + INTERVAL '7 hours'
+     AND pp.payment_date < $1::date + INTERVAL '1 day' + INTERVAL '6 hours'`
+  }
   GROUP BY
     pp.payment_method
 
