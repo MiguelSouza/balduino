@@ -1138,12 +1138,65 @@ ORDER BY
         }
       }
     });
+
+    const timeline: { type: string; createdAt: string; data: any }[] = [];
+
+    customersOrdersList.forEach(customer => {
+      customer.orders.forEach(order => {
+        timeline.push({
+          type: 'order',
+          createdAt: order.createdAt,
+          data: {
+            ...order,
+            customerId: customer.customerId,
+            customerName: customer.customerName,
+            tableId: customer.tableId
+          }
+        });
+      });
+    });
+
+    // Adiciona pagamentos parciais à timeline
+    payments.forEach((payment: any) => {
+      if (payment.payment_date) {
+        timeline.push({
+          type: 'payment',
+          createdAt: payment.payment_date,
+          data: payment
+        });
+      }
+    });
+
+    // Adiciona transferências recebidas à timeline
+    transferProducts.forEach((transfer:any) => {
+      if (transfer.created_at) {
+        timeline.push({
+          type: 'transfer',
+          createdAt: transfer.created_at,
+          data: transfer
+        });
+      }
+    });
+
+    // Ordena tudo por createdAt (mais recentes primeiro)
+    timeline.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   
+    const totalSpentOnOrders = timeline
+      .filter(item => item.type === 'order')
+      .reduce((total, item) => total + (item.data.totalValue || 0), 0);
+
+    const totalTransfers = timeline
+      .filter(item => item.type === 'transfer')
+      .reduce((total, item) => total + ((item.data.price || 0) * (item.data.quantity_transferred || 0)), 0);
+
+    const totalOverall = totalSpentOnOrders + totalTransfers;
+
+    
     return {
-      orders: customersOrdersList,
-      partialPayments: payments,
-      transferProducts
+      timeline,
+      total: totalOverall
     };
+
   }
   
 }
