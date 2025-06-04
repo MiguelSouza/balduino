@@ -36,10 +36,10 @@ export default class GenerateReportUseCase {
             formattedRow[key] = format(value, 'dd/MM/yyyy', { locale: ptBR });
           } else if (
             typeof value === 'number' &&
-            /(valor|preço|total|preco)/i.test(key)
+            /(valor|preço|total|preco)/i.test(key) &&
+            key !== 'valor_total' // impede formatação com R$ se for valor_total
           ) {
             formattedRow[key] = currencyFormatter.format(value);
-
           } else {
             formattedRow[key] = value;
           }
