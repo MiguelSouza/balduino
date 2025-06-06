@@ -969,7 +969,7 @@ GROUP BY
            (EXTRACT(HOUR FROM pp.payment_date) < 9 AND pp.payment_date::date = ($1::date + INTERVAL '1 day')::date)
          )`
   }
-  }
+  
   GROUP BY
     pp.payment_method
 
