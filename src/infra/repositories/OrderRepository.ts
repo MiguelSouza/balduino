@@ -123,8 +123,7 @@ export default class OrderRepository implements IOrderRepository {
   
   async payCreditOrder(creditPaymentUsage: CreditPaymentUsage): Promise<void> {
     
-    const orders = await this.getAllOrdersByCustomer(creditPaymentUsage.customerId || '');
-    console.log(orders)
+    const orders = await this.getOrders(creditPaymentUsage.customerId || '');
     const deliveredOrders = orders.orders[0].orders
       .filter((order: any) => order.status === 'delivered')
       .sort((a:any, b:any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -389,6 +388,214 @@ export default class OrderRepository implements IOrderRepository {
   }
 
   async getAllOrdersByCustomer(customerId: string): Promise<any> {
+    const result = await this.connection?.query(`
+      SELECT 
+        o.order_id, 
+        o.order_number,
+        o.created_at,
+        o.created_by,
+        c.name AS customer_name,
+        c.customer_id AS customer_id, 
+        t.table_id AS table_id, 
+        o.status, 
+        o.credit_origin, 
+        p.product_id, 
+        p.name AS product_name, 
+        p.value AS product_value, 
+        p.type, 
+        op.quantity,
+        op.price,
+        t.name AS table_name,
+    
+        -- Pagamentos parciais
+        COALESCE(pp.total_partial_payment, 0) AS total_partial_payment,
+        pp.payments,
+    
+        -- Transferências recebidas
+        COALESCE(tp.transfer_products, '[]') AS transfer_products
+    
+      FROM balduino.order o 
+      JOIN balduino.order_product op ON o.order_id = op.order_id
+      JOIN balduino.customer c ON c.customer_id = o.customer_id
+      JOIN balduino.table t ON t.table_id = o.table_id
+      JOIN balduino.product p ON p.product_id = op.product_id
+    
+      -- Pagamentos parciais agregados
+      LEFT JOIN (
+        SELECT 
+            order_id,
+            SUM(value) AS total_partial_payment,
+            json_agg(
+                json_build_object(
+                    'payment_date', payment_date,
+                    'payment_method', payment_method,
+                    'value', value
+                )
+            ) AS payments
+        FROM balduino.partial_payment
+        GROUP BY order_id
+      ) pp ON pp.order_id = o.order_id
+    
+      -- Transferências recebidas agregadas por produto/pedido
+      LEFT JOIN LATERAL (
+        SELECT json_agg(
+          json_build_object(
+            'order_transfer_history_id', oth.order_transfer_history_id,
+            'from_customer_id', cf.customer_id,
+            'from_customer_name', cf.name,
+            'quantity_transferred', oth.quantity_transferred,
+            'product_name', p.name,
+            'created_at', oth.created_at,
+            'created_at', oth.created_at,
+            'price', op_from.price
+          )
+        ) AS transfer_products
+        FROM balduino.order_transfer_history oth
+        JOIN balduino.customer cf ON cf.customer_id = oth.from_customer_id
+        JOIN balduino.order_product op_from ON op_from.order_id = oth.from_order_id AND op_from.product_id = oth.product_id
+        WHERE oth.to_order_id = o.order_id AND oth.product_id = p.product_id
+      ) tp ON true
+    
+      WHERE c.customer_id = $1 
+        AND o.status = $2 
+        AND op.quantity > 0
+    
+      ORDER BY o.order_number, p.product_id;
+    `, [customerId, 'delivered']);
+
+    const customersOrdersList: { customerId: string, tableId: string, customerName: string, orders: any[], totalAmount: number }[] = [];
+    let payments:any = [];
+    let transferProducts: any = [];
+    const addedPaymentsOrderIds = new Set<string>();
+    result?.forEach((row: any) => {
+      const customerName = row.customer_name;
+      const customerId = row.customer_id;
+      
+      if(row.transfer_products && row.order_id){
+        transferProducts.push(...row.transfer_products);
+      }
+
+      if (row.payments && row.order_id && !addedPaymentsOrderIds.has(row.order_id)) {
+        payments.push(...row.payments);
+        addedPaymentsOrderIds.add(row.order_id);
+      }
+
+      
+      let customer = customersOrdersList.find(item => item.customerName === customerName);
+    
+      if (!customer) {
+        customer = {
+          customerName: customerName,
+          customerId: customerId,
+          tableId: row.table_id,
+          orders: [],
+          totalAmount: 0,
+        };
+        customersOrdersList.push(customer);
+      }
+    
+      const orderIndex = customer.orders.findIndex((order: any) => order.order_id === row.order_id);
+    
+      const totalProductValue = row.price * row.quantity;
+      const totalPartialPayment = parseFloat(row.total_partial_payment);
+    
+      if (orderIndex === -1) {
+        customer.orders.push({
+          order_id: row.order_id,
+          orderNumber: row.order_number,
+          createdAt: row.created_at,
+          createdBy: row.created_by,
+          status: row.status,
+          tableName: row.table_name,
+          tableId: row.table_id,
+          products: [{
+            productId: row.product_id,
+            name: row.product_name,
+            quantity: row.quantity,
+            value: row.price,
+            type: row.type,
+            creditOrigin: row.credit_origin
+          }],
+          totalValue: totalProductValue - totalPartialPayment,
+          partialPaymentApplied: totalPartialPayment > 0 ? totalPartialPayment : 0,
+        });
+    
+        customer.totalAmount += (totalProductValue - totalPartialPayment);
+      } else {
+        customer.orders[orderIndex].products.push({
+          productId: row.product_id,
+          name: row.product_name,
+          quantity: row.quantity,
+          value: row.price,
+          type: row.type,
+          creditOrigin: row.credit_origin
+        });
+    
+        if (customer.orders[orderIndex].partialPaymentApplied === 0 && totalPartialPayment > 0) {
+          customer.orders[orderIndex].totalValue += totalProductValue - totalPartialPayment;
+          customer.totalAmount += (totalProductValue - totalPartialPayment);
+          customer.orders[orderIndex].partialPaymentApplied = totalPartialPayment;
+        } else {
+          customer.orders[orderIndex].totalValue += totalProductValue;
+          customer.totalAmount += totalProductValue;
+        }
+      }
+    });
+    
+    const timeline: { type: string; createdAt: string; data: any }[] = [];
+
+    customersOrdersList.forEach(customer => {
+      customer.orders.forEach(order => {
+        timeline.push({
+          type: 'order',
+          createdAt: order.createdAt,
+          data: {
+            ...order,
+            customerId: customer.customerId,
+            customerName: customer.customerName,
+            tableId: customer.tableId
+          }
+        });
+      });
+    });
+
+    // Adiciona pagamentos parciais à timeline
+    payments.forEach((payment: any) => {
+      if (payment.payment_date) {
+        timeline.push({
+          type: 'payment',
+          createdAt: payment.payment_date,
+          data: payment
+        });
+      }
+    });
+
+    // Adiciona transferências recebidas à timeline
+    transferProducts.forEach((transfer:any) => {
+      if (transfer.created_at) {
+        timeline.push({
+          type: 'transfer',
+          createdAt: transfer.created_at,
+          data: transfer
+        });
+      }
+    });
+
+    // Ordena tudo por createdAt (mais recentes primeiro)
+    timeline.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  
+    const total = timeline
+      .filter(item => item.type === 'order')
+      .reduce((total, item) => total + (item.data.totalValue || 0), 0);
+
+    
+    return {
+      timeline,
+      total
+    };
+  }
+
+  async getOrders(customerId: string): Promise<any> {
     const result = await this.connection?.query(`
       SELECT 
         o.order_id, 
@@ -752,11 +959,16 @@ GROUP BY
   JOIN
     balduino."order" o ON o.order_id = pp.order_id
   WHERE
-     ${filters.period === 'monthly' ?
-    `pp.payment_date >= date_trunc('month', $1::date) + INTERVAL '10 hours'
-     AND pp.payment_date < date_trunc('month', $1::date + INTERVAL '1 month')` :
-    `pp.payment_date >= $1::date + INTERVAL '7 hours'
-     AND pp.payment_date < $1::date + INTERVAL '1 day' + INTERVAL '6 hours'`
+  ${
+    filters.period === 'monthly'
+      ? `pp.payment_date >= date_trunc('month', $1::date) + INTERVAL '10 hours'
+         AND pp.payment_date < date_trunc('month', $1::date + INTERVAL '1 month')`
+      : `(
+           (EXTRACT(HOUR FROM pp.payment_date) >= 10 AND pp.payment_date::date = $1::date)
+           OR
+           (EXTRACT(HOUR FROM pp.payment_date) < 9 AND pp.payment_date::date = ($1::date + INTERVAL '1 day')::date)
+         )`
+  }
   }
   GROUP BY
     pp.payment_method
@@ -887,7 +1099,6 @@ ORDER BY
         creditPayment.updatedAt?.toISOString()
       ]
     );
-    console.log(result)
     
     return result?.[0];
   }

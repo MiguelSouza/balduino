@@ -27,26 +27,20 @@ export default class GenerateReportUseCase {
     }
 
     data.forEach((row: any) => {
-        const formattedRow: any = {};
-      
-        for (const key in row) {
-          const value = row[key];
-      
-          if (value instanceof Date) {
-            formattedRow[key] = format(value, 'dd/MM/yyyy', { locale: ptBR });
-          } else if (
-            typeof value === 'number' &&
-            /(valor|preço|total|preco)/i.test(key) &&
-            key !== 'valor_total' // impede formatação com R$ se for valor_total
-          ) {
-            formattedRow[key] = currencyFormatter.format(value);
-          } else {
-            formattedRow[key] = value;
-          }
+      const formattedRow: any = {};
+    
+      for (const key in row) {
+        const value = row[key];
+    
+        if (value instanceof Date) {
+          formattedRow[key] = format(value, 'dd/MM/yyyy', { locale: ptBR });
+        } else {
+          formattedRow[key] = value;
         }
-      
-        worksheet.addRow(formattedRow);
-      });
+      }
+    
+      worksheet.addRow(formattedRow);
+    });
 
     const arrayBuffer = await workbook.xlsx.writeBuffer();
     const buffer = Buffer.from(arrayBuffer);
