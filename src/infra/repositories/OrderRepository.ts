@@ -122,8 +122,9 @@ export default class OrderRepository implements IOrderRepository {
   }
   
   async payCreditOrder(creditPaymentUsage: CreditPaymentUsage): Promise<void> {
-    const orders = await this.getAllOrdersByCustomer(creditPaymentUsage.customerId || '');
     
+    const orders = await this.getAllOrdersByCustomer(creditPaymentUsage.customerId || '');
+    console.log(orders)
     const deliveredOrders = orders.orders[0].orders
       .filter((order: any) => order.status === 'delivered')
       .sort((a:any, b:any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -550,6 +551,11 @@ export default class OrderRepository implements IOrderRepository {
   async closeAccount(customerId: string, paymentMethod: string, discount: number) {
     const client = this.connection;
     if (!discount || discount <= 0) {
+      const creditPaymentUsage = new CreditPaymentUsage({
+        customer_id: customerId,
+        value: 0,
+      })
+      await this.payCreditOrder(creditPaymentUsage)
       await client?.query(
         `
         UPDATE balduino.order
@@ -610,6 +616,12 @@ export default class OrderRepository implements IOrderRepository {
   
       remainingDiscount -= totalProductValue;
     }
+
+    const creditPaymentUsage = new CreditPaymentUsage({
+      customer_id: customerId,
+      value: 0,
+    })
+    await this.payCreditOrder(creditPaymentUsage)
   
     await client?.query(
       `
@@ -875,6 +887,7 @@ ORDER BY
         creditPayment.updatedAt?.toISOString()
       ]
     );
+    console.log(result)
     
     return result?.[0];
   }
